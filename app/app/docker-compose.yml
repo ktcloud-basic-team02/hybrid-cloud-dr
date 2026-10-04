@@ -1,0 +1,27 @@
+services:
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_DATABASE: shop
+      MYSQL_USER: shop
+      MYSQL_PASSWORD: shoppass
+    volumes:
+      - mysql-data:/var/lib/mysql
+
+  app:
+    build: .
+    environment:
+      APP_ENV: aws
+      DB_HOST: mysql
+      INIT_DB: "1"
+    ports:
+      - "8080:8080"
+    volumes:
+      - app-logs:/var/log/shop
+    depends_on:
+      - mysql
+
+volumes:
+  mysql-data:
+  app-logs:
