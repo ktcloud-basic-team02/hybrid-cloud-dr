@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{% block title %}BEAVER Parfum{% endblock %}</title>
+<script>try{var t=localStorage.getItem("theme")||(matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light");document.documentElement.dataset.theme=t}catch(e){document.documentElement.dataset.theme="light"}</script>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"></head>
+<body>
+<header><div class="wrap">
+<a class="brand" href="{{ url_for('products') }}">BEAVER<small>PARFUM</small></a>
+<nav>
+<a href="{{ url_for('products') }}">Shop</a>
+<a href="{{ url_for('cart') }}">Bag{% if cart_count %}<span class="badge">({{ cart_count }})</span>{% endif %}</a>
+{% if user %}<a href="{{ url_for('logout') }}">Logout</a>{% else %}<a href="{{ url_for('login') }}">Login</a><a href="{{ url_for('signup') }}">Join</a>{% endif %}
+<span class="envbadge {{ env }}" title="현재 응답 중인 환경"><i></i>{{ env_label }}</span>
+<button id="theme" type="button" aria-label="테마 변경">◐</button>
+</nav></div></header>
+<main class="wrap">
+{% for m in get_flashed_messages() %}<div class="flash">{{ m }}</div>{% endfor %}
+{% block body %}{% endblock %}
+</main>
+<script>document.getElementById("theme").onclick=function(){var d=document.documentElement,n=d.dataset.theme==="dark"?"light":"dark";d.dataset.theme=n;try{localStorage.setItem("theme",n)}catch(e){}}</script>
+</body></html>

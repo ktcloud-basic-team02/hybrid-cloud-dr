@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block body %}
+<h1>Shopping bag</h1>
+{% if not items %}
+<div class="empty panel">장바구니가 비어 있어요.<br><br><a class="btn" href="{{ url_for('products') }}">쇼핑하러 가기</a></div>
+{% else %}
+<div class="cols" style="margin-top:24px">
+<div class="panel">
+{% for i in items %}{% set p = i.product %}
+<div class="row">
+{% include "_thumb.html" %}
+<div class="info"><div class="name">{{ p.name }}</div><div class="notes">{{ p.brand }} · {{ p.price|won }}</div></div>
+<form method="post" action="{{ url_for('cart_update', pid=p.id) }}" style="display:flex;gap:8px">
+<input class="qty" type="number" name="qty" value="{{ i.qty }}" min="0" max="{{ p.stock }}">
+<button class="btn line" style="padding:6px 12px">변경</button></form>
+<b style="width:90px;text-align:right">{{ i.sub|won }}</b>
+</div>{% endfor %}
+</div>
+<div class="panel sum">
+<div><span>상품 금액</span><span>{{ total|won }}</span></div>
+<div><span>배송비</span><span>{{ "무료" if total >= 30000 else "3,000원" }}</span></div>
+<div class="t"><span>합계</span><span>{{ (total if total >= 30000 else total + 3000)|won }}</span></div>
+<a class="btn green full" href="{{ url_for('checkout') }}">주문하기</a>
+</div></div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block body %}
+<section class="hero">
+<div>
+<p class="eyebrow">Autumn Edit 2026</p>
+<h1>Scent,<br><em>curated.</em></h1>
+<p class="sub">마지막 1병, 당신만의 아우라를 완성할 향.<br>한정판 향수의 실시간 재고를 확인하고 주문하세요.</p>
+<a class="btn" href="#list">Shop now</a>
+</div>
+<div class="hero-img"><img src="{{ url_for('static', filename='img/p7.jpg') }}" alt=""></div>
+</section>
+<div class="grid" id="list">
+{% for p in products %}
+<div class="card" style="--i:{{ loop.index0 }}">
+{% include "_thumb.html" %}
+<div class="meta">
+<div class="brandname">{{ p.brand }}</div>
+<div class="name">{{ p.name }}</div>
+<div class="notes">{{ p.notes }}</div>
+<div class="price"><span>{{ p.price|won }}</span><small>{{ p.size_ml }} ML</small></div>
+<form method="post" action="{{ url_for('cart_add', pid=p.id) }}">
+<button class="btn full" {% if p.stock == 0 %}disabled{% endif %}>{% if p.stock == 0 %}Sold out{% else %}장바구니 담기{% endif %}</button>
+</form></div></div>
+{% endfor %}
+</div>
+{% if recent %}
+<h2 style="font-size:30px;margin:0 0 20px">최근 주문</h2>
+<div class="panel" style="margin-bottom:90px">
+{% for o in recent %}<div class="row"><div class="info"><div class="name" style="font-size:18px">#{{ o.id }}</div>
+<div class="notes">{% for i in o["items"] %}{{ i.name }} × {{ i.qty }}{% if not loop.last %}, {% endif %}{% endfor %} · {{ o.env }} · {{ o.created_at.strftime('%m-%d %H:%M') }}</div></div>
+<b>{{ o.total|won }}</b><span class="brandname" style="width:60px;text-align:right">{{ o.status }}</span></div>{% endfor %}
+</div>{% endif %}
+{% endblock %}

@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block body %}
+<h1>Checkout</h1>
+<form method="post" class="cols" style="margin-top:24px">
+<div class="panel">
+<label>받는 분</label><input type="text" name="name" required>
+<label>연락처</label><input type="tel" name="phone" required>
+<label>주소</label><input type="text" name="address" required>
+<label>결제 수단</label>
+<div class="pay">
+<label><input type="radio" name="pay" value="card" checked> 카드</label>
+<label><input type="radio" name="pay" value="bank"> 무통장입금</label>
+</div></div>
+<div class="panel sum">
+{% for i in items %}<div><span>{{ i.product.brand }} {{ i.product.name }} × {{ i.qty }}</span><span>{{ i.sub|won }}</span></div>{% endfor %}
+<div class="t"><span>합계</span><span>{{ (total if total >= 30000 else total + 3000)|won }}</span></div>
+<button class="btn green full">결제하기</button>
+</div></form>
+{% endblock %}

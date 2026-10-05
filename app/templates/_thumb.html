@@ -1,0 +1,5 @@
+{% set src = p.image_url if p.image_url.startswith('http') else url_for('static', filename=p.image_url) %}
+<div class="thumb{% if p.stock == 0 %} out{% endif %}">
+<img src="{{ src }}" alt="{{ p.brand }} {{ p.name }}" loading="lazy" style="object-position:{{ p.pos or 'center' }}">
+{% if p.stock == 0 %}<span class="tag">SOLD OUT</span>{% elif p.limited %}<span class="tag low">LIMITED · {{ p.stock }} LEFT</span>{% elif p.stock <= 5 %}<span class="tag low">ONLY {{ p.stock }} LEFT</span>{% endif %}
+</div>

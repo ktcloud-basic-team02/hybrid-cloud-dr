@@ -1,27 +1,18 @@
 services:
-  mysql:
-    image: mysql:8.0
-    environment:
-      MYSQL_ROOT_PASSWORD: rootpass
-      MYSQL_DATABASE: shop
-      MYSQL_USER: shop
-      MYSQL_PASSWORD: shoppass
-    volumes:
-      - mysql-data:/var/lib/mysql
-
   app:
     build: .
+    ports: ["5000:5000"]
     environment:
-      APP_ENV: aws
-      DB_HOST: mysql
-      INIT_DB: "1"
-    ports:
-      - "8080:8080"
-    volumes:
-      - app-logs:/var/log/shop
-    depends_on:
-      - mysql
-
-volumes:
-  mysql-data:
-  app-logs:
+      - APP_ENV=onprem
+      - DB_HOST=db
+      - DB_USER=root
+      - DB_PASSWORD=rootpass
+      - DB_NAME=beaver_db
+      - INIT_DB=1
+    depends_on: [db]
+  db:
+    image: mariadb:10.11
+    environment:
+      - MYSQL_ROOT_PASSWORD=rootpass
+      - MYSQL_DATABASE=beaver_db
+    ports: ["3306:3306"]

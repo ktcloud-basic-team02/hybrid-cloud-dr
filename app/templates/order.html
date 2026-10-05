@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block body %}
+<div class="login panel" style="text-align:center;max-width:460px">
+<h1 style="margin-top:0">주문이 완료됐어요</h1>
+<p class="sub">주문번호 #{{ o.id }}</p>
+<p>{% for i in o["items"] %}{{ i.brand }} {{ i.name }} × {{ i.qty }}<br>{% endfor %}</p>
+<p><b>{{ o.total|won }}</b></p>
+<a class="btn" href="{{ url_for('products') }}">계속 쇼핑하기</a>
+</div>
+{% endblock %}
