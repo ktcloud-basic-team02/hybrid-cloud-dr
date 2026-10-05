@@ -1,12 +1,12 @@
 # app
 
-DR 시나리오 테스트용 신발 쇼핑몰. 한정 상품(재고 1개) 1종과 일반 상품 5종이 있다.
+DR 시나리오 테스트용 향수 쇼핑몰. 한정 상품(재고 1개) 1종과 일반 상품 5종
 
 ## 실행
 
     docker compose up -d --build
 
-http://localhost:8080 접속. 스키마가 바뀌었을 때는 `docker compose down -v` 후 다시 실행한다.
+http://localhost:5000 접속. 스키마가 바뀌었을 때는 `docker compose down -v` 후 다시 실행한다.
 
 ## 환경변수
 
