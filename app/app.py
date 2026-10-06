@@ -27,6 +27,7 @@ log.addHandler(stream)
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "change-me")
+RESET_TOKEN = os.environ.get("RESET_TOKEN", "")
 
 SESSIONS = {}
 REQ = {}
@@ -110,11 +111,17 @@ def health():
 @app.route("/metrics")
 def metrics():
     lines = ["# HELP shop_orders_total 주문 수 (환경, 결과별)", "# TYPE shop_orders_total counter"]
+    db_up = 1
     try:
         for r in db.order_counts():
             lines.append(f'shop_orders_total{{env="{r["env"]}",result="{r["status"]}"}} {r["n"]}')
     except Exception:
+        db_up = 0
         log.exception("metrics: DB 조회 실패")
+    lines += ["# HELP shop_db_up DB 연결 상태 (1=정상, 0=끊김)", "# TYPE shop_db_up gauge",
+              f"shop_db_up {db_up}"]
+    lines += ["# HELP shop_info 앱이 실행 중인 환경", "# TYPE shop_info gauge",
+              f'shop_info{{env="{APP_ENV}"}} 1']
     lines += ["# HELP shop_sessions 로그인 중인 사용자 수", "# TYPE shop_sessions gauge",
               f"shop_sessions {sum(1 for s in SESSIONS.values() if s['user'])}"]
     lines += ["# HELP shop_requests_total HTTP 요청 수", "# TYPE shop_requests_total counter"]
@@ -127,6 +134,8 @@ def metrics():
 
 @app.route("/api/reset", methods=["POST", "GET"])
 def api_reset():
+    if RESET_TOKEN and request.args.get("token") != RESET_TOKEN:
+        return jsonify(status="forbidden"), 403
     db.reset()
     log.warning("reset: 주문 삭제, 재고 초기화")
     return jsonify(status="reset")
