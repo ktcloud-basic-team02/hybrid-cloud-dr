@@ -1,18 +1,31 @@
 services:
   app:
     build: .
+    restart: unless-stopped
     ports: ["5000:5000"]
     environment:
-      - APP_ENV=onprem
-      - DB_HOST=db
-      - DB_USER=root
-      - DB_PASSWORD=rootpass
-      - DB_NAME=beaver_db
-      - INIT_DB=1
+      - APP_ENV=${APP_ENV:-onprem}
+      - DB_HOST=${DB_HOST:-db}
+      - DB_USER=${DB_USER:-shop}
+      - DB_PASSWORD=${DB_PASSWORD:-shoppass}
+      - DB_NAME=${DB_NAME:-beaver_db}
+      - INIT_DB=${INIT_DB:-1}
+      - SECRET_KEY=${SECRET_KEY:-change-me}
+      - RESET_TOKEN=${RESET_TOKEN:-}
+    volumes:
+      - ./logs:/var/log/shop
     depends_on: [db]
   db:
     image: mariadb:10.11
+    restart: unless-stopped
     environment:
       - MYSQL_ROOT_PASSWORD=rootpass
       - MYSQL_DATABASE=beaver_db
+      - MYSQL_USER=shop
+      - MYSQL_PASSWORD=shoppass
     ports: ["3306:3306"]
+    volumes:
+      - dbdata:/var/lib/mysql
+
+volumes:
+  dbdata:
