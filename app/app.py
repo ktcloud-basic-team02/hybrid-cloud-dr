@@ -1,6 +1,7 @@
 import os
 import re
 import secrets
+import time
 import logging
 from functools import wraps
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, g, Response
@@ -20,10 +21,16 @@ log = logging.getLogger("shop")
 log.setLevel(logging.INFO)
 log.addHandler(handler)
 
+stream = logging.StreamHandler()
+stream.setFormatter(handler.formatter)
+log.addHandler(stream)
+
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "change-me")
 
 SESSIONS = {}
+REQ = {}
+LAT = {"sum": 0.0, "count": 0}
 SKIP = ("/static", "/health", "/metrics", "/api")
 
 if os.environ.get("INIT_DB") == "1":
@@ -42,10 +49,20 @@ def load_session():
     g.s = SESSIONS[g.sid]
 
 
+@app.before_request
+def start_timer():
+    g.t0 = time.time()
+
+
 @app.after_request
 def save_session(resp):
     if g.get("new"):
         resp.set_cookie("sid", g.sid, httponly=True, samesite="Lax")
+    if not request.path.startswith("/metrics"):
+        k = (request.method, resp.status_code)
+        REQ[k] = REQ.get(k, 0) + 1
+        LAT["sum"] += time.time() - g.get("t0", time.time())
+        LAT["count"] += 1
     return resp
 
 
@@ -100,6 +117,11 @@ def metrics():
         log.exception("metrics: DB 조회 실패")
     lines += ["# HELP shop_sessions 로그인 중인 사용자 수", "# TYPE shop_sessions gauge",
               f"shop_sessions {sum(1 for s in SESSIONS.values() if s['user'])}"]
+    lines += ["# HELP shop_requests_total HTTP 요청 수", "# TYPE shop_requests_total counter"]
+    for (m, st), n in REQ.items():
+        lines.append(f'shop_requests_total{{method="{m}",status="{st}"}} {n}')
+    lines += ["# TYPE shop_request_seconds_sum counter", f"shop_request_seconds_sum {LAT['sum']}",
+              "# TYPE shop_request_seconds_count counter", f"shop_request_seconds_count {LAT['count']}"]
     return Response("\n".join(lines) + "\n", mimetype="text/plain")
 
 
