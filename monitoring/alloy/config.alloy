@@ -1,0 +1,28 @@
+local.file_match "shop" {
+  path_targets = [{
+    "__path__" = "/var/log/shop/app.log",
+    "job"      = "shop",
+    "env"      = "onprem",
+  }]
+}
+
+loki.source.file "shop" {
+  targets    = local.file_match.shop.targets
+  forward_to = [loki.process.shop.receiver]
+}
+
+loki.process "shop" {
+  stage.regex {
+    expression = "^(?P<ts>\\S+ \\S+) (?P<level>[A-Z]+) (?P<msg>.*)$"
+  }
+  stage.labels {
+    values = { level = "" }
+  }
+  forward_to = [loki.write.default.receiver]
+}
+
+loki.write "default" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "uid": "beaver-logs",
+  "title": "Beaver 에러 로그",
+  "tags": ["beaver"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "15s",
+  "time": { "from": "now-3h", "to": "now" },
+  "templating": {
+    "list": [
+      {"name":"search","type":"textbox","label":"검색어","query":"","current":{"text":"","value":""},"options":[{"selected":true,"text":"","value":""}]}
+    ]
+  },
+  "panels": [
+    {"id":1,"type":"stat","title":"최근 5분 ERROR","gridPos":{"h":4,"w":6,"x":0,"y":0},"datasource":{"type":"loki","uid":"loki"},"targets":[{"refId":"A","expr":"sum(count_over_time({job=\"shop\", level=\"ERROR\"}[5m])) or vector(0)","datasource":{"type":"loki","uid":"loki"}}],"fieldConfig":{"defaults":{"decimals":0,"thresholds":{"mode":"absolute","steps":[{"color":"green","value":null},{"color":"red","value":1}]}},"overrides":[]},"options":{"colorMode":"background","graphMode":"none"}},
+    {"id":2,"type":"stat","title":"최근 5분 WARNING","gridPos":{"h":4,"w":6,"x":6,"y":0},"datasource":{"type":"loki","uid":"loki"},"targets":[{"refId":"A","expr":"sum(count_over_time({job=\"shop\", level=\"WARNING\"}[5m])) or vector(0)","datasource":{"type":"loki","uid":"loki"}}],"fieldConfig":{"defaults":{"decimals":0,"thresholds":{"mode":"absolute","steps":[{"color":"green","value":null},{"color":"yellow","value":1}]}},"overrides":[]},"options":{"colorMode":"background","graphMode":"none"}},
+    {"id":3,"type":"timeseries","title":"레벨별 로그 수 (분당)","gridPos":{"h":4,"w":12,"x":12,"y":0},"datasource":{"type":"loki","uid":"loki"},"targets":[{"refId":"A","expr":"sum by (level) (count_over_time({job=\"shop\"}[1m]))","legendFormat":"{{level}}","datasource":{"type":"loki","uid":"loki"}}],"fieldConfig":{"defaults":{"custom":{"drawStyle":"bars","fillOpacity":60}},"overrides":[]}},
+    {"id":4,"type":"logs","title":"WARNING / ERROR 로그","gridPos":{"h":9,"w":24,"x":0,"y":4},"datasource":{"type":"loki","uid":"loki"},"targets":[{"refId":"A","expr":"{job=\"shop\", level=~\"WARNING|ERROR\"}","datasource":{"type":"loki","uid":"loki"}}],"options":{"showTime":true,"wrapLogMessage":true,"sortOrder":"Descending"}},
+    {"id":5,"type":"logs","title":"전체 로그 (검색어 입력 가능)","gridPos":{"h":10,"w":24,"x":0,"y":13},"datasource":{"type":"loki","uid":"loki"},"targets":[{"refId":"A","expr":"{job=\"shop\"} |= \"$search\"","datasource":{"type":"loki","uid":"loki"}}],"options":{"showTime":true,"wrapLogMessage":true,"sortOrder":"Descending"}}
+  ]
+}
