@@ -15,8 +15,12 @@ services:
     image: prom/node-exporter:v1.12.1
     container_name: node-exporter
     restart: unless-stopped
-    ports:
-      - "9100:9100"
+    pid: host
+    network_mode: host
+    command:
+      - '--path.rootfs=/host'
+    volumes:
+      - '/:/host:ro,rslave'
 
   grafana:
     image: grafana/grafana:13.2.3
