@@ -10,17 +10,8 @@ def get_conn():
         database=os.environ.get("DB_NAME", "project_db"),
         port=int(os.environ.get("DB_PORT", 3306)),
         charset="utf8mb4",
-        cursorclass=pymysql.cursors.DictCursor,
-        connect_timeout=3
+        cursorclass=pymysql.cursors.DictCursor
     )
-
-def ping():
-    try:
-        conn = get_conn()
-        conn.close()
-        return True
-    except Exception:
-        return False
 
 def init_db():
     conn = get_conn()
@@ -29,8 +20,7 @@ def init_db():
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS users (
                     USER_ID INT AUTO_INCREMENT PRIMARY KEY,
-                    EMAIL VARCHAR(255) UNIQUE NOT NULL,
-                    NAME VARCHAR(100) NOT NULL,
+                    USERNAME VARCHAR(255) UNIQUE NOT NULL,
                     PASSWORD_HASH VARCHAR(255) NOT NULL,
                     CREATED_AT TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
@@ -41,8 +31,7 @@ def init_db():
                     NAME VARCHAR(150) NOT NULL,
                     PRICE INT NOT NULL,
                     STOCK INT NOT NULL,
-                    INITIAL_STOCK INT NOT NULL,
-                    IMAGE_PATH VARCHAR(255)
+                    INITIAL_STOCK INT NOT NULL
                 );
             """)
             cur.execute("""
@@ -80,18 +69,25 @@ def init_db():
             cur.execute("SELECT COUNT(*) as cnt FROM products;")
             if cur.fetchone()["cnt"] == 0:
                 sample_products = [
-                    ("디올 자스데자르 오 드 퍼퓸", 380000, 1, 1, "dior1.jpg"),
-                    ("샤넬 가브리엘 오 드 빠르펭", 240000, 5, 5, "chanel1.jpg"),
-                    ("바이레도 블랑쉬 오 드 퍼퓸", 320000, 5, 5, "byredo1.jpg"),
-                    ("딥디크 오르페온 오 드 퍼퓸", 270000, 5, 5, "diptique1.jpg"),
-                    ("조말론 잉글리시 페어 앤 프리지아", 210000, 5, 5, "jomalone1.jpg"),
-                    ("르라보 상탈 33", 350000, 5, 5, "lelabo1.jpg")
+                    ("Ambre Solaire", 128000, 10, 10),
+                    ("Paradoxe", 156000, 10, 10),
+                    ("1st Collection", 98000, 5, 5),
+                    ("Coco Mademoiselle Intense", 198000, 5, 5),
+                    ("Town & Country", 420000, 1, 1),
+                    ("Ani", 215000, 5, 5)
                 ]
                 cur.executemany("""
-                    INSERT INTO products (NAME, PRICE, STOCK, INITIAL_STOCK, IMAGE_PATH)
-                    VALUES (%s, %s, %s, %s, %s)
+                    INSERT INTO products (NAME, PRICE, STOCK, INITIAL_STOCK)
+                    VALUES (%s, %s, %s, %s)
                 """, sample_products)
+        conn.commit()
+    finally:
+        conn.close()
 
+def reset_db():
+    conn = get_conn()
+    try:
+        with conn.cursor() as cur:
             cur.execute("SET FOREIGN_KEY_CHECKS = 0;")
             cur.execute("TRUNCATE TABLE order_items;")
             cur.execute("TRUNCATE TABLE orders;")
@@ -99,20 +95,21 @@ def init_db():
             cur.execute("SET FOREIGN_KEY_CHECKS = 1;")
             cur.execute("UPDATE products SET STOCK = INITIAL_STOCK;")
         conn.commit()
+        return True
+    except Exception:
+        conn.rollback()
+        return False
     finally:
         conn.close()
 
-def reset():
-    init_db()
-
-def create_user(email, name, password):
+def create_user(username, password):
     conn = get_conn()
     try:
-        pw_hash = generate_password_hash(password)
         with conn.cursor() as cur:
+            pwd_hash = generate_password_hash(password)
             cur.execute(
-                "INSERT INTO users (EMAIL, NAME, PASSWORD_HASH) VALUES (%s, %s, %s)",
-                (email, name, pw_hash)
+                "INSERT INTO users (USERNAME, PASSWORD_HASH) VALUES (%s, %s)",
+                (username, pwd_hash)
             )
         conn.commit()
         return True
@@ -122,11 +119,11 @@ def create_user(email, name, password):
     finally:
         conn.close()
 
-def check_user(email, password):
+def check_user(username, password):
     conn = get_conn()
     try:
         with conn.cursor() as cur:
-            cur.execute("SELECT * FROM users WHERE EMAIL = %s", (email,))
+            cur.execute("SELECT * FROM users WHERE USERNAME = %s", (username,))
             user = cur.fetchone()
         if user and check_password_hash(user["PASSWORD_HASH"], password):
             return user
@@ -135,43 +132,84 @@ def check_user(email, password):
         conn.close()
 
 def list_products():
+    ui_data = {
+        1: {"brand": "BEAVER", "size_ml": "50", "notes": "Amber · Vanilla · Sandalwood", "image_url": "img/p1.jpg"},
+        2: {"brand": "PRADA", "size_ml": "50", "notes": "Neroli · Pink Pear · Amber", "image_url": "img/p2.jpg"},
+        3: {"brand": "MORRA", "size_ml": "50", "notes": "Rose · Cedar · Clove · Tonka", "image_url": "img/p3.jpg"},
+        4: {"brand": "CHANEL", "size_ml": "50", "notes": "Orange · Rose · Patchouli", "image_url": "img/p5.jpg"},
+        5: {"brand": "CLIVE CHRISTIAN", "size_ml": "50", "notes": "Frankincense · Amber · Spice", "image_url": "img/p6.jpg"},
+        6: {"brand": "NISHANE", "size_ml": "50", "notes": "Vanilla · Ginger · Cardamom", "image_url": "img/p7.jpg"}
+    }
     conn = get_conn()
     try:
         with conn.cursor() as cur:
             cur.execute("SELECT * FROM products ORDER BY PRODUCT_ID")
-            return cur.fetchall()
+            products = cur.fetchall()
+            for p in products:
+                pid = p["PRODUCT_ID"]
+                meta = ui_data.get(pid, {"brand": "BRAND", "size_ml": "50", "notes": "Notes", "image_url": "img/p1.jpg"})
+                p["id"] = pid
+                p["name"] = p["NAME"]
+                p["price"] = p["PRICE"]
+                p["stock"] = p["STOCK"]
+                p["brand"] = meta["brand"]
+                p["size_ml"] = meta["size_ml"]
+                p["notes"] = meta["notes"]
+                p["image_url"] = meta["image_url"]
+            return products
     finally:
         conn.close()
 
-def get_product(pid):
+def get_cart(user_id):
     conn = get_conn()
     try:
         with conn.cursor() as cur:
-            cur.execute("SELECT * FROM products WHERE PRODUCT_ID = %s", (pid,))
-            return cur.fetchone()
+            cur.execute("""
+                SELECT c.PRODUCT_ID, c.QUANTITY, p.NAME, p.PRICE, p.STOCK 
+                FROM carts c JOIN products p ON c.PRODUCT_ID = p.PRODUCT_ID 
+                WHERE c.USER_ID = %s
+            """, (user_id,))
+            rows = cur.fetchall()
+            items = []
+            total = 0
+            ui_data = {
+                1: {"brand": "BEAVER"}, 2: {"brand": "PRADA"}, 3: {"brand": "MORRA"},
+                4: {"brand": "CHANEL"}, 5: {"brand": "CLIVE CHRISTIAN"}, 6: {"brand": "NISHANE"}
+            }
+            for r in rows:
+                sub = r["PRICE"] * r["QUANTITY"]
+                total += sub
+                items.append({
+                    "qty": r["QUANTITY"],
+                    "sub": sub,
+                    "product": {
+                        "id": r["PRODUCT_ID"],
+                        "name": r["NAME"],
+                        "price": r["PRICE"],
+                        "stock": r["STOCK"],
+                        "brand": ui_data.get(r["PRODUCT_ID"], {}).get("brand", "BRAND")
+                    }
+                })
+            return items, total
     finally:
         conn.close()
 
-def get_cart_items(user_id):
+def update_cart(user_id, product_id, qty):
     conn = get_conn()
     try:
         with conn.cursor() as cur:
-            cur.execute("SELECT * FROM carts WHERE USER_ID = %s", (user_id,))
-            return cur.fetchall()
+            if qty <= 0:
+                cur.execute("DELETE FROM carts WHERE USER_ID = %s AND PRODUCT_ID = %s", (user_id, product_id))
+            else:
+                cur.execute("""
+                    INSERT INTO carts (USER_ID, PRODUCT_ID, QUANTITY) VALUES (%s, %s, %s)
+                    ON DUPLICATE KEY UPDATE QUANTITY = %s
+                """, (user_id, product_id, qty, qty))
+        conn.commit()
     finally:
         conn.close()
 
-def get_cart_count(user_id):
-    conn = get_conn()
-    try:
-        with conn.cursor() as cur:
-            cur.execute("SELECT SUM(QUANTITY) as cnt FROM carts WHERE USER_ID = %s", (user_id,))
-            res = cur.fetchone()
-            return res["cnt"] or 0
-    finally:
-        conn.close()
-
-def add_to_cart(user_id, product_id, quantity):
+def add_to_cart(user_id, product_id, quantity=1):
     conn = get_conn()
     try:
         with conn.cursor() as cur:
@@ -184,40 +222,34 @@ def add_to_cart(user_id, product_id, quantity):
     finally:
         conn.close()
 
-def update_cart_qty(user_id, product_id, quantity):
+def place_order(user_id, server_env):
     conn = get_conn()
     try:
         with conn.cursor() as cur:
-            if quantity > 0:
-                cur.execute("""
-                    INSERT INTO carts (USER_ID, PRODUCT_ID, QUANTITY)
-                    VALUES (%s, %s, %s)
-                    ON DUPLICATE KEY UPDATE QUANTITY = %s
-                """, (user_id, product_id, quantity, quantity))
-            else:
-                cur.execute("DELETE FROM carts WHERE USER_ID = %s AND PRODUCT_ID = %s", (user_id, product_id))
-        conn.commit()
-    finally:
-        conn.close()
+            cur.execute("""
+                SELECT c.PRODUCT_ID, c.QUANTITY, p.PRICE, p.STOCK 
+                FROM carts c JOIN products p ON c.PRODUCT_ID = p.PRODUCT_ID 
+                WHERE c.USER_ID = %s
+            """, (user_id,))
+            cart_items = cur.fetchall()
+            if not cart_items:
+                return None, "장바구니가 비어 있습니다."
 
-def place_order(user_id, items, ship_fee, server_env):
-    conn = get_conn()
-    try:
-        with conn.cursor() as cur:
-            total_price = sum(item["sub"] for item in items) + ship_fee
+            total_product_price = sum(item["PRICE"] * item["QUANTITY"] for item in cart_items)
+            shipping = 0 if total_product_price >= 30000 else 3000
+            total_price = total_product_price + shipping
+            
             import uuid
             order_no = str(uuid.uuid4())
 
-            for item in items:
-                pid = item["product"]["PRODUCT_ID"]
-                qty = item["qty"]
+            for item in cart_items:
                 cur.execute(
                     "UPDATE products SET STOCK = STOCK - %s WHERE PRODUCT_ID = %s AND STOCK >= %s",
-                    (qty, pid, qty)
+                    (item["QUANTITY"], item["PRODUCT_ID"], item["QUANTITY"])
                 )
                 if cur.rowcount == 0:
                     conn.rollback()
-                    return False, None
+                    return None, "재고가 부족합니다."
 
             cur.execute("""
                 INSERT INTO orders (ORDER_NO, USER_ID, TOTAL_PRICE, STATUS, PAYMENT_METHOD, PAYMENT_STATUS, SERVER_ENV)
@@ -225,59 +257,66 @@ def place_order(user_id, items, ship_fee, server_env):
             """, (order_no, user_id, total_price, server_env))
             order_id = cur.lastrowid
 
-            for item in items:
-                pid = item["product"]["PRODUCT_ID"]
-                qty = item["qty"]
-                unit_price = item["product"]["PRICE"]
-                subtotal = item["sub"]
+            for item in cart_items:
+                subtotal = item["PRICE"] * item["QUANTITY"]
                 cur.execute("""
                     INSERT INTO order_items (ORDER_ID, PRODUCT_ID, QUANTITY, UNIT_PRICE, SUBTOTAL)
                     VALUES (%s, %s, %s, %s, %s)
-                """, (order_id, pid, qty, unit_price, subtotal))
+                """, (order_id, item["PRODUCT_ID"], item["QUANTITY"], item["PRICE"], subtotal))
 
             cur.execute("DELETE FROM carts WHERE USER_ID = %s", (user_id,))
         conn.commit()
-        return True, order_no
-    except Exception:
+        return order_id, None
+    except Exception as e:
         conn.rollback()
-        return False, None
+        return None, str(e)
     finally:
         conn.close()
 
-def get_order_by_no(order_no, user_id):
+def get_order(order_id):
     conn = get_conn()
     try:
         with conn.cursor() as cur:
-            cur.execute("SELECT * FROM orders WHERE ORDER_NO = %s AND USER_ID = %s", (order_no, user_id))
-            order = cur.fetchone()
-            if not order:
+            cur.execute("SELECT * FROM orders WHERE ORDER_ID = %s", (order_id,))
+            o = cur.fetchone()
+            if not o:
                 return None
+            ui_data = {1: {"brand": "BEAVER"}, 2: {"brand": "PRADA"}, 3: {"brand": "MORRA"}, 4: {"brand": "CHANEL"}, 5: {"brand": "CLIVE CHRISTIAN"}, 6: {"brand": "NISHANE"}}
             cur.execute("""
-                SELECT oi.*, p.NAME, p.IMAGE_PATH FROM order_items oi
-                JOIN products p ON oi.PRODUCT_ID = p.PRODUCT_ID
+                SELECT oi.QUANTITY as qty, p.PRODUCT_ID, p.NAME as name
+                FROM order_items oi JOIN products p ON oi.PRODUCT_ID = p.PRODUCT_ID
                 WHERE oi.ORDER_ID = %s
-            """, (order["ORDER_ID"],))
-            order["items"] = cur.fetchall()
-            return order
+            """, (order_id,))
+            rows = cur.fetchall()
+            items = []
+            for r in rows:
+                pid = r["PRODUCT_ID"]
+                items.append({
+                    "brand": ui_data.get(pid, {}).get("brand", "BRAND"),
+                    "name": r["name"],
+                    "qty": r["qty"]
+                })
+            return {
+                "id": o["ORDER_ID"],
+                "total": o["TOTAL_PRICE"],
+                "env": o["SERVER_ENV"],
+                "status": o["STATUS"],
+                "created_at": o["CREATED_AT"],
+                "items": items
+            }
     finally:
         conn.close()
 
-def recent_orders(user_id, n=5):
+def recent_orders(user_id):
     conn = get_conn()
     try:
         with conn.cursor() as cur:
-            cur.execute("""
-                SELECT * FROM orders WHERE USER_ID = %s ORDER BY ORDER_ID DESC LIMIT %s
-            """, (user_id, n))
-            orders = cur.fetchall()
-            for o in orders:
-                cur.execute("""
-                    SELECT oi.*, p.NAME FROM order_items oi
-                    JOIN products p ON oi.PRODUCT_ID = p.PRODUCT_ID
-                    WHERE oi.ORDER_ID = %s
-                """, (o["ORDER_ID"],))
-                o["items"] = cur.fetchall()
-            return orders
+            cur.execute("SELECT ORDER_ID FROM orders WHERE USER_ID = %s ORDER BY ORDER_ID DESC LIMIT 3", (user_id,))
+            order_ids = [row["ORDER_ID"] for row in cur.fetchall()]
+            res = []
+            for oid in order_ids:
+                res.append(get_order(oid))
+            return res
     finally:
         conn.close()
 

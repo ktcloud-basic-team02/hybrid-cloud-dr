@@ -1,5 +1,16 @@
-{% set src = p.image_url if p.image_url.startswith('http') else url_for('static', filename=p.image_url) %}
-<div class="thumb{% if p.stock == 0 %} out{% endif %}">
-<img src="{{ src }}" alt="{{ p.brand }} {{ p.name }}" loading="lazy" style="object-position:{{ p.pos or 'center' }}">
-{% if p.stock == 0 %}<span class="tag">SOLD OUT</span>{% elif p.limited %}<span class="tag low">LIMITED · {{ p.stock }} LEFT</span>{% elif p.stock <= 5 %}<span class="tag low">ONLY {{ p.stock }} LEFT</span>{% endif %}
+<div class="thumb" style="aspect-ratio: 3/4; overflow: hidden; position: relative; background: var(--line);">
+    {% if p.image_url and p.image_url.startswith('http') %}
+        <img src="{{ p.image_url }}" alt="{{ p.name }}" style="width: 100%; height: 100%; object-fit: cover;">
+    {% elif p.image_url %}
+        <img src="{{ url_for('static', filename=p.image_url) }}" alt="{{ p.name }}" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" style="width: 100%; height: 100%; object-fit: cover;">
+        <div style="display:none; color: #888; font-size: 14px; text-align: center;">{{ p.name }}</div>
+    {% else %}
+        <div style="color: #888; font-size: 14px; text-align: center;">{{ p.name }}</div>
+    {% endif %}
+
+    {% if p.stock == 0 %}
+        <span class="tag" style="position: absolute; top: 12px; left: 12px; background: #333; color: #fff; padding: 5px 9px; font-size: 10px;">SOLD OUT</span>
+    {% elif p.stock <= 5 %}
+        <span class="tag low" style="position: absolute; top: 12px; left: 12px; background: var(--card); border: 1px solid var(--gold); color: var(--gold); padding: 5px 9px; font-size: 10px;">ONLY {{ p.stock }} LEFT</span>
+    {% endif %}
 </div>

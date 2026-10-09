@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>BEAVER Parfum · Cloud DR Demo</title>
+    <script>
+        try {
+            var t = localStorage.getItem("theme") || (matchMedia("(prefers-color-scheme:dark)").matches ? "dark" : "light");
+            document.documentElement.dataset.theme = t;
+        } catch(e) {
+            document.documentElement.dataset.theme = "dark";
+        }
+    </script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<header>
+    <div class="wrap">
+        <a class="brand" href="#shop">BEAVER<small>PARFUM</small></a>
+        <nav>
+            <a href="#shop">Shop</a>
+            <a href="#cart">Bag<span class="badge" id="cnt"></span></a>
+            <a href="#login" id="auth">Login</a>
+            <span class="envbadge"><i></i>Active Node</span>
+            <button id="theme" type="button" aria-label="테마 변경">◐</button>
+        </nav>
+    </div>
+</header>
+<main class="wrap" id="app"></main>
+<script>
+const IMGMAP = {};
+const src = p => IMGMAP[p] || p, won = v => v.toLocaleString("ko-KR") + "원";
+const P = [
+    {id:1, b:"Beaver", n:"Ambre Solaire", no:"Amber · Vanilla · Sandalwood", pr:128000, st:30, img:"{{ url_for('static', filename='img/p1.jpg') }}", pos:"50% 62%"},
+    {id:2, b:"Prada", n:"Paradoxe", no:"Neroli · Pink Pear · Amber", pr:156000, st:30, img:"{{ url_for('static', filename='img/p2.jpg') }}", pos:"50% 60%"},
+    {id:3, b:"Morra", n:"1st Collection", no:"Rose · Cedar · Clove · Tonka", pr:98000, st:30, img:"{{ url_for('static', filename='img/p3.jpg') }}", pos:"50% 50%"},
+    {id:4, b:"Chanel", n:"Coco Mademoiselle Intense", no:"Orange · Rose · Patchouli", pr:198000, st:30, img:"{{ url_for('static', filename='img/p5.jpg') }}", pos:"50% 50%"},
+    {id:5, b:"Clive Christian", n:"Town & Country", no:"Frankincense · Amber · Spice", pr:420000, st:0, lim:1, img:"{{ url_for('static', filename='img/p6.jpg') }}", pos:"55% 50%"},
+    {id:6, b:"Nishane", n:"Ani", no:"Vanilla · Ginger · Cardamom", pr:215000, st:30, img:"{{ url_for('static', filename='img/p7.jpg') }}", pos:"45% 50%"}
+];
+let cart = {}, user = null, oid = 1;
+const items = () => Object.keys(cart).map(k => ({...P.find(p => p.id == k), q: cart[k]}));
+const total = () => items().reduce((s, i) => s + i.pr * i.q, 0);
+const ship = t => t >= 30000 ? t : t + 3000;
+const thumb = p => `<div class="thumb${p.st == 0 ? " out" : ""}"><img src="${src(p.img)}" alt="" style="object-position:${p.pos}">${p.st == 0 ? '<span class="tag">SOLD OUT</span>' : p.lim ? `<span class="tag low">LIMITED · ${p.st} LEFT</span>` : ""}</div>`;
+const card = (p, i) => `<div class="card" style="--i:${i}">${thumb(p)}<div class="meta"><div class="brandname">${p.b}</div><div class="name">${p.n}</div><div class="notes">${p.no}</div><div class="price"><span>${won(p.pr)}</span><small>50 ML</small></div><button class="btn full" ${p.st == 0 ? "disabled" : ""} onclick="add(${p.id})">${p.st == 0 ? "Sold out" : "장바구니 담기"}</button></div></div>`;
+
+const V = {
+    shop: () => `<section class="hero"><div><p class="eyebrow">Cloud DR Architecture Edit</p><h1>Resilient,<br><em>fail-safe.</em></h1><p class="sub">이중화된 멀티 클라우드 환경에서 안전하게 구동되는<br>고가용성 퍼퓸 스토어 데모 애플리케이션입니다.</p><a class="btn" href="#list" onclick="document.getElementById('list').scrollIntoView({behavior:'smooth'});return false">Shop now</a></div><div class="hero-img"><img src="${src("{{ url_for('static', filename='img/p7.jpg') }}")}" alt=""></div></section><div class="grid" id="list">${P.map(card).join("")}</div>`,
+    cart: () => {
+        const it = items();
+        if(!it.length) return `<h1>Shopping bag</h1><div class="empty panel">장바구니가 비어 있어요.<br><br><a class="btn" href="#shop">쇼핑하러 가기</a></div>`;
+        const t = total();
+        return `<h1>Shopping bag</h1><div class="cols" style="margin-top:24px"><div class="panel">${it.map(i => `<div class="row">${thumb({...i, st:9, lim:0})}<div class="info"><div class="name">${i.n}</div><div class="notes">${i.b} ·${won(i.pr)}</div></div><input class="qty" type="number" min="0" max="${i.st}" value="${i.q}" onchange="setq(${i.id},this.value)"><b style="width:100px;text-align:right">${won(i.pr * i.q)}</b></div>`).join("")}</div><div class="panel sum"><div><span>상품 금액</span><span>${won(t)}</span></div><div><span>배송비</span><span>${t >= 30000 ? "무료" : "3,000원"}</span></div><div class="t"><span>합계</span><span>${won(ship(t))}</span></div><a class="btn green full" href="#checkout">주문하기</a></div></div>`;
+    },
+    checkout: () => {
+        const it = items();
+        if(!it.length) return V.cart();
+        return `<h1>Checkout</h1><div class="cols" style="margin-top:24px"><div class="panel"><label>받는 분</label><input type="text" value="홍길동"><label>연락처</label><input type="tel" value="010-0000-0000"><label>주소</label><input type="text" value="서울특별시 은평구"><label>결제 수단</label><div class="pay"><label><input type="radio" name="pay" checked> 카드</label><label><input type="radio" name="pay"> 무통장입금</label></div></div><div class="panel sum">${it.map(i => `<div><span>${i.b}${i.n} × ${i.q}</span><span>${won(i.pr * i.q)}</span></div>`).join("")}<div class="t"><span>합계</span><span>${won(ship(total()))}</span></div><button class="btn green full" onclick="pay()">결제하기</button></div></div>`;
+    },
+    login: () => `<div class="login panel"><h1 style="margin-top:0;font-size:30px">로그인</h1><label>아이디</label><input type="text" id="u" value="admin"><label>비밀번호</label><input type="password" value="********"><button class="btn green full" onclick="signin()">로그인</button><p class="sub" style="margin:16px 0 0">DR 시뮬레이션 테스트용 인증 세션 연동 영역입니다.</p></div>`,
+    done: () => `<div class="login panel" style="text-align:center;max-width:460px"><h1 style="margin-top:0">주문이 완료됐어요</h1><p class="sub">주문번호 #${oid - 1}</p><a class="btn" href="#shop">계속 쇼핑하기</a></div>`
+};
+
+function render() {
+    let v = (location.hash || "#shop").slice(1);
+    if(!V[v]) v = "shop";
+    if(v == "checkout" && !user) { location.hash = "login"; return; }
+    document.getElementById("app").innerHTML = V[v]();
+    const n = Object.values(cart).reduce((a, b) => a + b, 0);
+    document.getElementById("cnt").textContent = n ? " (" + n + ")" : "";
+    document.getElementById("auth").textContent = user ? "Logout" : "Login";
+    window.scrollTo(0, 0);
+}
+
+function add(id) { const p = P.find(x => x.id == id); cart[id] = Math.min((cart[id] || 0) + 1, p.st); location.hash = "cart"; }
+function setq(id, q) { q = Math.min(+q, P.find(x => x.id == id).st); if(q > 0) cart[id] = q; else delete cart[id]; render(); }
+function signin() { user = document.getElementById("u").value || "admin"; location.hash = "shop"; }
+function pay() { items().forEach(i => P.find(p => p.id == i.id).st -= i.q); cart = {}; oid++; location.hash = "done"; }
+
+document.getElementById("auth").onclick = e => { if(user) { e.preventDefault(); user = null; render(); } };
+window.onhashchange = render;
+render();
+
+document.getElementById("theme").onclick = function() {
+    var d = document.documentElement, n = d.dataset.theme === "dark" ? "light" : "dark";
+    d.dataset.theme = n;
+    try { localStorage.setItem("theme", n); } catch(e) {}
+};
+</script>
+</body>
+</html>
