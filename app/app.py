@@ -3,8 +3,10 @@ import re
 import secrets
 import time
 import logging
+import uuid
 from functools import wraps
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, g, Response
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, g, Response, session
+from werkzeug.security import generate_password_hash, check_password_hash
 import db
 
 APP_ENV = os.environ.get("APP_ENV", "aws")
@@ -29,7 +31,6 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "change-me")
 RESET_TOKEN = os.environ.get("RESET_TOKEN", "")
 
-SESSIONS = {}
 REQ = {}
 LAT = {"sum": 0.0, "count": 0}
 SKIP = ("/static", "/health", "/metrics", "/api")
@@ -39,26 +40,12 @@ if os.environ.get("INIT_DB") == "1":
 
 
 @app.before_request
-def load_session():
-    g.sid, g.new = request.cookies.get("sid"), False
-    if request.path.startswith(SKIP):
-        g.s = {"user": None, "cart": {}}
-        return
-    if g.sid not in SESSIONS:
-        g.sid, g.new = secrets.token_hex(16), True
-        SESSIONS[g.sid] = {"user": None, "cart": {}}
-    g.s = SESSIONS[g.sid]
-
-
-@app.before_request
 def start_timer():
     g.t0 = time.time()
 
 
 @app.after_request
 def save_session(resp):
-    if g.get("new"):
-        resp.set_cookie("sid", g.sid, httponly=True, samesite="Lax")
     if not request.path.startswith("/metrics"):
         k = (request.method, resp.status_code)
         REQ[k] = REQ.get(k, 0) + 1
@@ -70,25 +57,31 @@ def save_session(resp):
 def login_required(f):
     @wraps(f)
     def wrapper(*a, **kw):
-        if not g.s["user"]:
+        if not session.get("user_id"):
             return redirect(url_for("login", next=request.path))
         return f(*a, **kw)
     return wrapper
 
 
-def cart_items():
-    items = []
-    for pid, qty in g.s["cart"].items():
-        p = db.get_product(pid)
+def get_cart_items(user_id):
+    items = db.get_cart_items(user_id)
+    formatted = []
+    total = 0
+    for item in items:
+        p = db.get_product(item["PRODUCT_ID"])
         if p:
-            items.append(dict(product=p, qty=qty, sub=p["price"] * qty))
-    return items, sum(i["sub"] for i in items)
+            sub = p["PRICE"] * item["QUANTITY"]
+            total += sub
+            formatted.append(dict(product=p, qty=item["QUANTITY"], sub=sub))
+    return formatted, total
 
 
 @app.context_processor
 def common():
-    return dict(cart_count=sum(g.s["cart"].values()), user=g.s["user"],
-                env=APP_ENV, env_label=ENV_LABEL.get(APP_ENV, APP_ENV))
+    user_id = session.get("user_id")
+    cart_count = db.get_cart_count(user_id) if user_id else 0
+    user = {"id": user_id, "email": session.get("user_email"), "name": session.get("user_name")} if user_id else None
+    return dict(cart_count=cart_count, user=user, env=APP_ENV, env_label=ENV_LABEL.get(APP_ENV, APP_ENV))
 
 
 @app.template_filter("won")
@@ -123,7 +116,7 @@ def metrics():
     lines += ["# HELP shop_info 앱이 실행 중인 환경", "# TYPE shop_info gauge",
               f'shop_info{{env="{APP_ENV}"}} 1']
     lines += ["# HELP shop_sessions 로그인 중인 사용자 수", "# TYPE shop_sessions gauge",
-              f"shop_sessions {sum(1 for s in SESSIONS.values() if s['user'])}"]
+              f"shop_sessions {1 if session.get('user_id') else 0}"]
     lines += ["# HELP shop_requests_total HTTP 요청 수", "# TYPE shop_requests_total counter"]
     for (m, st), n in REQ.items():
         lines.append(f'shop_requests_total{{method="{m}",status="{st}"}} {n}')
@@ -137,100 +130,106 @@ def api_reset():
     if RESET_TOKEN and request.args.get("token") != RESET_TOKEN:
         return jsonify(status="forbidden"), 403
     db.reset()
-    log.warning("reset: 주문 삭제, 재고 초기화")
+    log.warning("reset: 데이터 초기화, 재고 원복")
     return jsonify(status="reset")
 
 
 @app.route("/signup", methods=["GET", "POST"])
 def signup():
     if request.method == "POST":
-        u, pw = request.form["username"].strip(), request.form["password"]
-        if not re.fullmatch(r"[A-Za-z0-9_]{3,20}", u) or len(pw) < 4:
-            flash("아이디는 영문/숫자 3~20자, 비밀번호는 4자 이상이어야 합니다.")
-        elif db.create_user(u, pw):
-            log.info("signup: %s", u)
+        email = request.form["email"].strip()
+        name = request.form["name"].strip()
+        password = request.form["password"]
+
+        if not email or not name or len(password) < 4:
+            flash("모든 필드를 올바르게 입력해주세요. (비밀번호 4자 이상)")
+        elif db.create_user(email, name, password):
+            log.info("signup: %s", email)
             flash("가입이 완료됐습니다. 로그인해 주세요.")
             return redirect(url_for("login"))
         else:
-            flash("이미 사용 중인 아이디입니다.")
+            flash("이미 사용 중인 이메일입니다.")
     return render_template("signup.html")
 
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
-        u = db.check_user(request.form["username"], request.form["password"])
+        email = request.form["email"].strip()
+        password = request.form["password"]
+        u = db.check_user(email, password)
         if u:
-            g.s["user"] = u
-            log.info("login: %s", u["username"])
+            session["user_id"] = u["USER_ID"]
+            session["user_email"] = u["EMAIL"]
+            session["user_name"] = u["NAME"]
+            log.info("login: %s", email)
             return redirect(request.args.get("next") or url_for("products"))
-        log.info("login 실패: %s", request.form["username"])
-        flash("아이디 또는 비밀번호가 올바르지 않습니다.")
+        log.info("login 실패: %s", email)
+        flash("이메일 또는 비밀번호가 올바르지 않습니다.")
     return render_template("login.html")
 
 
 @app.route("/logout")
 def logout():
-    SESSIONS.pop(g.sid, None)
+    session.clear()
     return redirect(url_for("products"))
 
 
 @app.route("/products")
 def products():
-    recent = db.recent_orders(g.s["user"]["id"]) if g.s["user"] else []
+    user_id = session.get("user_id")
+    recent = db.recent_orders(user_id) if user_id else []
     return render_template("products.html", products=db.list_products(), recent=recent)
 
 
 @app.route("/cart")
+@login_required
 def cart():
-    items, total = cart_items()
+    items, total = get_cart_items(session["user_id"])
     return render_template("cart.html", items=items, total=total)
 
 
 @app.route("/cart/add/<int:pid>", methods=["POST"])
+@login_required
 def cart_add(pid):
     p = db.get_product(pid)
-    if not p or p["stock"] < 1:
+    if not p or p["STOCK"] < 1:
         flash("품절된 상품입니다.")
         return redirect(url_for("products"))
-    c = g.s["cart"]
-    c[pid] = min(c.get(pid, 0) + 1, p["stock"])
+    db.add_to_cart(session["user_id"], pid, 1)
     return redirect(url_for("cart"))
 
 
 @app.route("/cart/update/<int:pid>", methods=["POST"])
+@login_required
 def cart_update(pid):
     qty = int(request.form.get("qty", 0))
-    if qty > 0:
-        g.s["cart"][pid] = qty
-    else:
-        g.s["cart"].pop(pid, None)
+    db.update_cart_qty(session["user_id"], pid, qty)
     return redirect(url_for("cart"))
 
 
 @app.route("/checkout", methods=["GET", "POST"])
 @login_required
 def checkout():
-    items, total = cart_items()
+    user_id = session["user_id"]
+    items, total = get_cart_items(user_id)
     if not items:
         return redirect(url_for("cart"))
     if request.method == "POST":
         ship = total if total >= 30000 else total + 3000
-        ok, oid = db.place_order(g.s["user"]["id"], items, ship, APP_ENV)
-        log.info("order #%s %s (%s) user=%s", oid, "success" if ok else "fail", APP_ENV, g.s["user"]["username"])
+        ok, order_no = db.place_order(user_id, items, ship, APP_ENV)
+        log.info("order #%s %s (%s) user=%s", order_no, "success" if ok else "fail", APP_ENV, session["user_email"])
         if not ok:
             flash("재고가 부족해 주문에 실패했습니다.")
-            g.s["cart"].clear()
             return redirect(url_for("products"))
-        g.s["cart"].clear()
-        return redirect(url_for("order_done", oid=oid))
+        return redirect(url_for("order_done", order_no=order_no))
     return render_template("checkout.html", items=items, total=total)
 
 
-@app.route("/order/<int:oid>")
+@app.route("/order/<order_no>")
 @login_required
-def order_done(oid):
-    o = db.get_order(oid, g.s["user"]["id"])
+def order_done(order_no):
+    o = db.get_order_by_no(order_no, session["user_id"])
     if not o:
         return redirect(url_for("products"))
     return render_template("order.html", o=o)

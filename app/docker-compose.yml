@@ -1,3 +1,5 @@
+version: '3.8'
+
 services:
   app:
     build: .
@@ -8,24 +10,42 @@ services:
       - DB_HOST=${DB_HOST:-db}
       - DB_USER=${DB_USER:-shop}
       - DB_PASSWORD=${DB_PASSWORD:-shoppass}
-      - DB_NAME=${DB_NAME:-beaver_db}
+      - DB_NAME=${DB_NAME:-project_db}
       - INIT_DB=${INIT_DB:-1}
       - SECRET_KEY=${SECRET_KEY:-change-me}
       - RESET_TOKEN=${RESET_TOKEN:-}
+      - TZ=Asia/Seoul
     volumes:
       - ./logs:/var/log/shop
-    depends_on: [db]
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - shop-net
+
   db:
     image: mariadb:10.11
     restart: unless-stopped
     environment:
       - MYSQL_ROOT_PASSWORD=rootpass
-      - MYSQL_DATABASE=beaver_db
+      - MYSQL_DATABASE=project_db
       - MYSQL_USER=shop
       - MYSQL_PASSWORD=shoppass
+      - TZ=Asia/Seoul
     ports: ["3306:3306"]
     volumes:
       - dbdata:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - shop-net
 
 volumes:
   dbdata:
+
+networks:
+  shop-net:
+    driver: bridge
