@@ -1,5 +1,4 @@
 import os
-import time
 import pymysql
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -27,11 +26,76 @@ def init_db():
     conn = get_conn()
     try:
         with conn.cursor() as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS users (
+                    USER_ID INT AUTO_INCREMENT PRIMARY KEY,
+                    EMAIL VARCHAR(255) UNIQUE NOT NULL,
+                    NAME VARCHAR(100) NOT NULL,
+                    PASSWORD_HASH VARCHAR(255) NOT NULL,
+                    CREATED_AT TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS products (
+                    PRODUCT_ID INT AUTO_INCREMENT PRIMARY KEY,
+                    NAME VARCHAR(150) NOT NULL,
+                    PRICE INT NOT NULL,
+                    STOCK INT NOT NULL,
+                    INITIAL_STOCK INT NOT NULL,
+                    IMAGE_PATH VARCHAR(255)
+                );
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS carts (
+                    USER_ID INT,
+                    PRODUCT_ID INT,
+                    QUANTITY INT NOT NULL,
+                    PRIMARY KEY (USER_ID, PRODUCT_ID)
+                );
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS orders (
+                    ORDER_ID INT AUTO_INCREMENT PRIMARY KEY,
+                    ORDER_NO VARCHAR(36) UNIQUE NOT NULL,
+                    USER_ID INT NOT NULL,
+                    TOTAL_PRICE INT NOT NULL,
+                    STATUS VARCHAR(50) NOT NULL,
+                    PAYMENT_METHOD VARCHAR(50) NOT NULL,
+                    PAYMENT_STATUS VARCHAR(50) NOT NULL,
+                    SERVER_ENV VARCHAR(50) NOT NULL,
+                    CREATED_AT TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS order_items (
+                    ORDER_ITEM_ID INT AUTO_INCREMENT PRIMARY KEY,
+                    ORDER_ID INT NOT NULL,
+                    PRODUCT_ID INT NOT NULL,
+                    QUANTITY INT NOT NULL,
+                    UNIT_PRICE INT NOT NULL,
+                    SUBTOTAL INT NOT NULL
+                );
+            """)
+            
+            cur.execute("SELECT COUNT(*) as cnt FROM products;")
+            if cur.fetchone()["cnt"] == 0:
+                sample_products = [
+                    ("디올 자스데자르 오 드 퍼퓸", 380000, 1, 1, "dior1.jpg"),
+                    ("샤넬 가브리엘 오 드 빠르펭", 240000, 5, 5, "chanel1.jpg"),
+                    ("바이레도 블랑쉬 오 드 퍼퓸", 320000, 5, 5, "byredo1.jpg"),
+                    ("딥디크 오르페온 오 드 퍼퓸", 270000, 5, 5, "diptique1.jpg"),
+                    ("조말론 잉글리시 페어 앤 프리지아", 210000, 5, 5, "jomalone1.jpg"),
+                    ("르라보 상탈 33", 350000, 5, 5, "lelabo1.jpg")
+                ]
+                cur.executemany("""
+                    INSERT INTO products (NAME, PRICE, STOCK, INITIAL_STOCK, IMAGE_PATH)
+                    VALUES (%s, %s, %s, %s, %s)
+                """, sample_products)
+
             cur.execute("SET FOREIGN_KEY_CHECKS = 0;")
             cur.execute("TRUNCATE TABLE order_items;")
             cur.execute("TRUNCATE TABLE orders;")
             cur.execute("TRUNCATE TABLE carts;")
-            cur.execute("TRUNCATE TABLE users;")
             cur.execute("SET FOREIGN_KEY_CHECKS = 1;")
             cur.execute("UPDATE products SET STOCK = INITIAL_STOCK;")
         conn.commit()
@@ -62,9 +126,8 @@ def check_user(email, password):
     conn = get_conn()
     try:
         with conn.cursor() as cur:
-            cursor = cur
-            cursor.execute("SELECT * FROM users WHERE EMAIL = %s", (email,))
-            user = cursor.fetchone()
+            cur.execute("SELECT * FROM users WHERE EMAIL = %s", (email,))
+            user = cur.fetchone()
         if user and check_password_hash(user["PASSWORD_HASH"], password):
             return user
         return None
@@ -138,11 +201,11 @@ def update_cart_qty(user_id, product_id, quantity):
         conn.close()
 
 def place_order(user_id, items, ship_fee, server_env):
-    import uuid
     conn = get_conn()
     try:
         with conn.cursor() as cur:
             total_price = sum(item["sub"] for item in items) + ship_fee
+            import uuid
             order_no = str(uuid.uuid4())
 
             for item in items:
