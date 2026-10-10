@@ -7,7 +7,7 @@
 <p class="sub">마지막 1병, 당신만의 아우라를 완성할 향.<br>한정판 향수의 실시간 재고를 확인하고 주문하세요.</p>
 <a class="btn" href="#list">Shop now</a>
 </div>
-<div class="hero-img"><img src="{{ url_for('static', filename='img/p7.jpg') }}" alt=""></div>
+<div class="hero-img"><img src="{{ url_for('static', filename='img/p3.jpg') }}" alt=""></div>
 </section>
 <div class="grid" id="list">
 {% for p in products %}
@@ -30,4 +30,23 @@
 <div class="notes">{% for i in o["items"] %}{{ i.name }} × {{ i.qty }}{% if not loop.last %}, {% endif %}{% endfor %} · {{ o.env }} · {{ o.created_at.strftime('%m-%d %H:%M') }}</div></div>
 <b>{{ o.total|won }}</b><span class="brandname" style="width:60px;text-align:right">{{ o.status }}</span></div>{% endfor %}
 </div>{% endif %}
+<script>
+document.querySelectorAll('form[action^="/cart/add/"]').forEach(function (f) {
+  f.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var b = f.querySelector('button');
+    if (b.disabled) return;
+    fetch(f.action, { method: 'POST', headers: { 'X-Requested-With': 'fetch' } })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (d.login) { location.href = d.login; return; }
+        document.getElementById('cnt').textContent = '(' + d.count + ')';
+        var label = b.textContent;
+        b.textContent = '담았어요';
+        b.disabled = true;
+        setTimeout(function () { b.textContent = label; b.disabled = false; }, 900);
+      });
+  });
+});
+</script>
 {% endblock %}

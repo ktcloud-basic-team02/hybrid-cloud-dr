@@ -8,6 +8,7 @@
 <label>비밀번호</label><input type="password" name="password" required>
 <button class="btn green full">가입하기</button>
 </form>
-<p class="sub" style="margin:16px 0 0"><a href="{{ url_for('login') }}">이미 계정이 있나요? 로그인</a></p>
+<p class="sub" style="margin:22px 0 10px">이미 계정이 있나요?</p>
+<a class="btn line full" href="{{ url_for('login') }}">로그인</a>
 </div>
 {% endblock %}
