@@ -26,6 +26,7 @@ def get_conn():
         database=os.environ.get("DB_NAME", "project_db"),
         port=int(os.environ.get("DB_PORT", 3306)),
         charset="utf8mb4",
+        connect_timeout=3,
         cursorclass=pymysql.cursors.DictCursor,
     )
 

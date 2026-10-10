@@ -143,13 +143,19 @@ def api_reset():
 
 @app.route("/health")
 def health():
+    try:
+        db.ping()
+    except Exception:
+        return {"env": SERVER_ENV, "status": "down"}, 503
     return {"env": SERVER_ENV, "status": "ok"}
 
 
 @app.route("/metrics")
 def metrics():
-    counts = db.order_counts()
-    lines = [f'shop_orders_total{{env="{r["env"]}",status="{r["status"]}"}} {r["n"]}' for r in counts]
+    counts = {(e, s): 0 for e in ("aws", "onprem") for s in ("SUCCESS", "FAIL")}
+    for r in db.order_counts():
+        counts[(r["env"], r["status"])] = r["n"]
+    lines = [f'shop_orders_total{{env="{e}",status="{s}"}} {n}' for (e, s), n in counts.items()]
     return Response("\n".join(lines) + "\n", mimetype="text/plain")
 
 
