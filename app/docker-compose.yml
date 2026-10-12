@@ -23,6 +23,7 @@ services:
       - DB_NAME=project_db
       - DB_PORT=3306
       - SERVER_ENV=onprem
+      - SERVICE_MODE=active
     ports:
       - "5000:5000"
     depends_on:

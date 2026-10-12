@@ -331,3 +331,11 @@ def order_counts():
             return cur.fetchall()
     finally:
         conn.close()
+
+
+def ping():
+    conn = get_conn()
+    try:
+        conn.ping(reconnect=False)
+    finally:
+        conn.close()
