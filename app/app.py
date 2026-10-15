@@ -1,10 +1,18 @@
 from flask import Flask, render_template, request, redirect, url_for, session, Response, jsonify, flash
 import db
 import os
+import logging
+import sys
+
+logging.basicConfig(
+    stream=sys.stdout,
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(message)s"
+)
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "hybrid-cloud-dr-secret")
-SERVER_ENV = os.environ.get("SERVER_ENV", "onprem")
+SERVER_ENV = os.environ.get("SERVER_ENV", "aws")
 
 SERVICE_MODE = os.environ.get("SERVICE_MODE", "standby").strip().lower()
 if SERVICE_MODE not in {"active", "standby"}:
@@ -147,6 +155,7 @@ def order_complete(oid):
     o = db.get_order(oid)
     return render_template("order.html", o=o)
 
+RESET_ENABLED = os.environ.get("ENABLE_RESET", "false").lower() == "true"
 
 @app.route("/api/reset", methods=["POST"])
 def api_reset():
