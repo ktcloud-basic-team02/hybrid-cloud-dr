@@ -1,8 +1,8 @@
-<div class="thumb" style="aspect-ratio: 3/4; overflow: hidden; position: relative; background: var(--line);">
+<div class="thumb{% if p.stock == 0 %} out{% endif %}" style="aspect-ratio: 3/4; overflow: hidden; position: relative; background: var(--line);">
     {% if p.image_url and p.image_url.startswith('http') %}
-        <img src="{{ p.image_url }}" alt="{{ p.name }}" style="width: 100%; height: 100%; object-fit: cover;">
+        <img src="{{ p.image_url }}" alt="{{ p.name }}" style="width: 100%; height: 100%; object-fit: cover; object-position: {{ p.pos or '50% 50%' }};">
     {% elif p.image_url %}
-        <img src="{{ url_for('static', filename=p.image_url) }}" alt="{{ p.name }}" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" style="width: 100%; height: 100%; object-fit: cover;">
+        <img src="{{ url_for('static', filename=p.image_url) }}" alt="{{ p.name }}" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" style="width: 100%; height: 100%; object-fit: cover; object-position: {{ p.pos or '50% 50%' }};">
         <div style="display:none; color: #888; font-size: 14px; text-align: center;">{{ p.name }}</div>
     {% else %}
         <div style="color: #888; font-size: 14px; text-align: center;">{{ p.name }}</div>
