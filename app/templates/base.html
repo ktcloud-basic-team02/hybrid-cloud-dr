@@ -8,9 +8,9 @@
 <a class="brand" href="{{ url_for('products') }}">BEAVER<small>PARFUM</small></a>
 <nav>
 <a href="{{ url_for('products') }}">Shop</a>
-<a href="{{ url_for('cart') }}">Bag{% if cart_count %}<span class="badge">({{ cart_count }})</span>{% endif %}</a>
+<a id="bag" href="{{ url_for('cart') }}">Bag{% if cart_count %}<span class="badge">({{ cart_count }})</span>{% endif %}</a>
 {% if user %}<a href="{{ url_for('logout') }}">Logout</a>{% else %}<a href="{{ url_for('login') }}">Login</a><a href="{{ url_for('signup') }}">Join</a>{% endif %}
-<span class="envbadge {{ env }}" title="현재 응답 중인 환경"><i></i>{{ env_label }}</span>
+<span class="envbadge {{ env }}" title="{% if pod_short %}pod: {{ pod }}{% if node %} / node: {{ node }}{% endif %}{% else %}현재 응답 중인 환경{% endif %}"><i></i>{{ env_label }}{% if pod_short %} · {{ pod_short }}{% endif %}</span>
 <button id="theme" type="button" aria-label="테마 변경">◐</button>
 </nav></div></header>
 <main class="wrap">
@@ -18,4 +18,5 @@
 {% block body %}{% endblock %}
 </main>
 <script>document.getElementById("theme").onclick=function(){var d=document.documentElement,n=d.dataset.theme==="dark"?"light":"dark";d.dataset.theme=n;try{localStorage.setItem("theme",n)}catch(e){}}</script>
+<script>document.addEventListener("submit",function(e){var f=e.target;if(f.action.indexOf("/cart/add/")<0)return;e.preventDefault();var b=f.querySelector("button");fetch(f.action,{method:"POST",headers:{"X-Requested-With":"fetch"}}).then(function(r){if(r.status===401)return r.json().then(function(d){location.href=d.login});if(!r.ok)throw 0;return r.json().then(function(d){var bag=document.getElementById("bag"),s=bag.querySelector(".badge");if(!s){s=document.createElement("span");s.className="badge";bag.appendChild(s)}s.textContent="("+d.count+")";if(b){var t=b.textContent;b.textContent="담았어요";setTimeout(function(){b.textContent=t},1200)}})}).catch(function(){f.submit()})});</script>
 </body></html>

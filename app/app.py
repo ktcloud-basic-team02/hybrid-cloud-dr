@@ -1,10 +1,29 @@
 from flask import Flask, render_template, request, redirect, url_for, session, Response, jsonify, flash
 import db
 import os
+import socket
+import logging
+import sys
+
+logging.basicConfig(
+    stream=sys.stdout,
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(message)s"
+)
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "hybrid-cloud-dr-secret")
-SERVER_ENV = os.environ.get("SERVER_ENV", "onprem")
+SERVER_ENV = os.environ.get("SERVER_ENV", "aws").strip().lower()
+if SERVER_ENV not in {"aws", "onprem"}:
+    raise ValueError("SERVER_ENV must be aws or onprem")
+
+# 쿠버네티스에서는 hostname이 곧 파드 이름
+POD_NAME = os.environ.get("POD_NAME") or socket.gethostname()
+NODE_NAME = os.environ.get("NODE_NAME", "")
+# 파드 이름은 쿠버네티스(또는 POD_NAME 지정)일 때만 화면에 표시
+SHOW_POD = bool(os.environ.get("POD_NAME") or os.environ.get("KUBERNETES_SERVICE_HOST"))
+
+RESET_ENABLED = os.environ.get("ENABLE_RESET", "false").lower() == "true"
 
 SERVICE_MODE = os.environ.get("SERVICE_MODE", "standby").strip().lower()
 if SERVICE_MODE not in {"active", "standby"}:
@@ -24,10 +43,7 @@ def block_standby_writes():
 
 @app.context_processor
 def inject_globals():
-    cart_count = 0
-    if "user_id" in session:
-        items, _ = db.get_cart(session["user_id"])
-        cart_count = sum(i["qty"] for i in items)
+    cart_count = sum(session.get("cart", {}).values())
 
     user = None
     if "user_id" in session:
@@ -36,6 +52,9 @@ def inject_globals():
     return {
         "env": SERVER_ENV,
         "env_label": SERVER_ENV.upper(),
+        "pod": POD_NAME,
+        "pod_short": POD_NAME.split("-")[-1] if SHOW_POD else "",
+        "node": NODE_NAME,
         "user": user,
         "cart_count": cart_count,
     }
@@ -68,8 +87,8 @@ def login():
         password = request.form.get("password")
         user = db.check_user(username, password)
         if user:
-            session["user_id"] = user["USER_ID"]
-            session["username"] = user["EMAIL"]
+            session["user_id"] = user["id"]
+            session["username"] = user["username"]
             return redirect(url_for("products"))
         return render_template("login.html", error="아이디 또는 비밀번호가 올바르지 않습니다.")
     return render_template("login.html")
@@ -97,7 +116,7 @@ def logout():
 def cart():
     if "user_id" not in session:
         return redirect(url_for("login"))
-    items, total = db.get_cart(session["user_id"])
+    items, total = db.cart_items(session.get("cart", {}))
     return render_template("cart.html", items=items, total=total)
 
 
@@ -108,10 +127,11 @@ def cart_add(pid):
         if ajax:
             return jsonify({"login": url_for("login")}), 401
         return redirect(url_for("login"))
-    db.add_to_cart(session["user_id"], pid, 1)
+    cart = dict(session.get("cart", {}))
+    cart[str(pid)] = cart.get(str(pid), 0) + 1
+    session["cart"] = cart
     if ajax:
-        items, _ = db.get_cart(session["user_id"])
-        return jsonify({"count": sum(i["qty"] for i in items)})
+        return jsonify({"count": sum(cart.values())})
     return redirect(url_for("products"))
 
 
@@ -120,7 +140,12 @@ def cart_update(pid):
     if "user_id" not in session:
         return redirect(url_for("login"))
     qty = int(request.form.get("qty", 0))
-    db.update_cart(session["user_id"], pid, qty)
+    cart = dict(session.get("cart", {}))
+    if qty <= 0:
+        cart.pop(str(pid), None)
+    else:
+        cart[str(pid)] = qty
+    session["cart"] = cart
     return redirect(url_for("cart"))
 
 
@@ -128,12 +153,13 @@ def cart_update(pid):
 def checkout():
     if "user_id" not in session:
         return redirect(url_for("login"))
-    items, total = db.get_cart(session["user_id"])
+    items, total = db.cart_items(session.get("cart", {}))
     if not items:
         return redirect(url_for("cart"))
     if request.method == "POST":
-        order_id, err = db.place_order(session["user_id"], SERVER_ENV)
+        order_id, err = db.place_order(session["user_id"], session.get("cart", {}), SERVER_ENV)
         if order_id:
+            session.pop("cart", None)
             return redirect(url_for("order_complete", oid=order_id))
         flash(f"주문에 실패했어요. {err}")
         return redirect(url_for("cart"))
@@ -150,6 +176,8 @@ def order_complete(oid):
 
 @app.route("/api/reset", methods=["POST"])
 def api_reset():
+    if not RESET_ENABLED:
+        return jsonify({"status": "fail", "message": "Reset is disabled."}), 403
     success = db.reset_db()
     if success:
         return jsonify({"status": "success", "message": "Database reset successfully."})
@@ -158,7 +186,7 @@ def api_reset():
 
 @app.route("/live")
 def live():
-    return {"env": SERVER_ENV, "status": "alive"}
+    return {"env": SERVER_ENV, "pod": POD_NAME, "status": "alive"}
 
 
 @app.route("/health")
@@ -169,12 +197,12 @@ def health():
         db.ping()
     except Exception:
         return {"env": SERVER_ENV, "mode": SERVICE_MODE, "status": "down"}, 503
-    return {"env": SERVER_ENV, "mode": SERVICE_MODE, "status": "ok"}
+    return {"env": SERVER_ENV, "pod": POD_NAME, "mode": SERVICE_MODE, "status": "ok"}
 
 
 @app.route("/metrics")
 def metrics():
-    counts = {(e, s): 0 for e in ("aws", "onprem") for s in ("SUCCESS", "FAIL")}
+    counts = {(e, s): 0 for e in ("aws", "onprem") for s in ("success", "fail")}
     for r in db.order_counts():
         counts[(r["env"], r["status"])] = r["n"]
     lines = [f'shop_orders_total{{env="{e}",status="{s}"}} {n}' for (e, s), n in counts.items()]
