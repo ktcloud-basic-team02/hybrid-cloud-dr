@@ -1,0 +1,34 @@
+# Local credentials and private keys
+.env
+.env.*
+*.pem
+*.key
+.aws/
+.ssh/
+
+# Development environments and caches
+.git/
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.idea/
+.vscode/
+
+# DB initialization is mounted into MySQL, not packaged into Flask
+db/
+app/
+*.sql
+
+# Local runtime data and editor backups
+*.log
+logs/
+*.bak
+*.swp
+*.swo
+docker-compose*.yml
+docker-compose*.yaml
+README*
