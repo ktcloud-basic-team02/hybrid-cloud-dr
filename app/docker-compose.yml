@@ -27,6 +27,7 @@ services:
       - DB_PORT=3306
       - SERVER_ENV=aws
       - SERVICE_MODE=active
+      - SECRET_KEY=${SECRET_KEY:-local-dev-secret-key} 
     ports:
       - "5000:5000"
     depends_on:
