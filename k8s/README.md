@@ -7,6 +7,7 @@
 | --- | --- |
 | app.yaml | namespace, ConfigMap, Deployment, ClusterIP Service |
 | hpa.yaml | CPU 사용률에 따라 앱 파드 2~6개로 확장 |
+| ingress.example.yaml | 설치된 NGINX 컨트롤러에 연결할 앱 경로 템플릿 |
 | secrets.env.example | 실제 인증값 없이 필요한 키만 제공 |
 
 ## 먼저 확보할 정보
@@ -85,3 +86,17 @@ HPA 적용 후 app.yaml의 replicas: 2를 재적용하면 파드 수가 일시�
 
 앱 코드의 포트 5000, DB 환경변수, /live, /health, POD_NAME/NODE_NAME 경로를 대조했습니다.
 실제 EKS에서 dry-run, 이미지 pull, DB 연결, AZ 분산 및 HPA 동작은 아직 검증하지 않았습니다.
+
+## Ingress 준비
+
+ingress.example.yaml은 템플릿입니다. 폴더 전체를 일괄 apply하지 마세요.
+먼저 kubectl get ingressclass와 kubectl get deployments,daemonsets -A로 설치된 컨트롤러를 확인합니다.
+NGINX라는 이름만으로 구현체를 특정하지 않으며 실제 컨트롤러/차트 버전과 지원 상태를 확인한 후 설치합니다.
+REPLACE_WITH_INGRESS_CLASS를 설치된 NGINX IngressClass 이름으로 교체하고 로컬에서는 namespace도 beaver-local로 바꿉니다.
+host는 필수로 명시합니다(F5 NGINX 컨트롤러 요구 조건).
+템플릿의 shop.example.com을 실제 도메인으로 바꾸고 로컬에서는 shop.localhost로 사용합니다.
+해당 host의 / 이하 경로를 같은 namespace의 shop Service 80으로 전달합니다.
+실제 도메인/TLS 설정은 운영 환경 확정 후 추가합니다.
+이 템플릿은 ALB를 생성하거나 ALB와 NGINX를 연결하지 않습니다.
+ALB→NGINX 구성에는 NGINX 대상 Service, ALB 대상 등록 및 헬스체크 설정이 별도로 필요합니다.
+ingressClassName을 alb로 바꿔 shop에 직접 연결하면 NGINX를 거치지 않는 다른 구성이므로 혼용하지 않습니다.
