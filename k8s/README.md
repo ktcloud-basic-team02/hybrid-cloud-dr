@@ -9,6 +9,7 @@
 | hpa.yaml | CPU 사용률에 따라 앱 파드 2~6개로 확장 |
 | ingress.example.yaml | 설치된 NGINX 컨트롤러에 연결할 앱 경로 템플릿 |
 | secrets.env.example | 실제 인증값 없이 필요한 키만 제공 |
+| ROLLOUT.md | 롤링 업데이트 설정 설명 및 정상 revision 롤백 절차 |
 
 ## 먼저 확보할 정보
 

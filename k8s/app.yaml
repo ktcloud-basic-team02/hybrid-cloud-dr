@@ -24,6 +24,8 @@ metadata:
 spec:
   replicas: 2
   revisionHistoryLimit: 3
+  minReadySeconds: 10
+  progressDeadlineSeconds: 300
   selector:
     matchLabels:
       app: shop
@@ -37,7 +39,7 @@ spec:
       labels:
         app: shop
     spec:
-      terminationGracePeriodSeconds: 40
+      terminationGracePeriodSeconds: 60
       topologySpreadConstraints:
         - maxSkew: 1
           topologyKey: topology.kubernetes.io/zone
@@ -54,6 +56,10 @@ spec:
       containers:
         - name: shop
           image: REPLACE_WITH_ECR_IMAGE_AND_TAG
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/bin/sh", "-c", "sleep 10"]
           ports:
             - name: http
               containerPort: 5000
