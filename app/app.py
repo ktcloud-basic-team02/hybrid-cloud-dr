@@ -12,7 +12,10 @@ logging.basicConfig(
 )
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY", "hybrid-cloud-dr-secret")
+SECRET_KEY = os.environ.get("SECRET_KEY")
+if not SECRET_KEY:
+    raise RuntimeError("SECRET_KEY 환경변수가 설정되지 않았습니다.")
+app.secret_key = SECRET_KEY
 SERVER_ENV = os.environ.get("SERVER_ENV", "aws").strip().lower()
 if SERVER_ENV not in {"aws", "onprem"}:
     raise ValueError("SERVER_ENV must be aws or onprem")
