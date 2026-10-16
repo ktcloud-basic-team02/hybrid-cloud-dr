@@ -34,12 +34,15 @@ kubectl --context docker-desktop -n beaver-local rollout history deployment/shop
 ## 새 이미지 배포
 
 ```powershell
-kubectl --context docker-desktop -n beaver-local set image deployment/shop shop=<NEW_IMAGE_URI>
+$newImage = "실제로_게시된_새_이미지_주소와_태그"
+kubectl --context docker-desktop -n beaver-local set image deployment/shop "shop=$newImage"
 kubectl --context docker-desktop -n beaver-local rollout status deployment/shop --timeout=360s
 kubectl --context docker-desktop -n beaver-local get pods -o wide
 ```
 
 set image는 이미지 필드만 변경하여 HPA가 조절한 replicas를 건드리지 않습니다.
+새 이미지가 정상 확인되면 app.yaml의 image에도 정상 이미지 주소를 반영합니다.
+반영하지 않고 파일을 다시 apply하면 파일에 남아 있던 이전 이미지로 되돌아갑니다.
 실패한 새 파드가 Pending/ImagePullBackOff/준비 검사 실패 상태이면 기존 정상 파드가 유지될 수 있습니다.
 rollout 명령 시간 초과와 실제 Deployment 실패 상태는 구분하여 describe/events/logs를 확인합니다.
 
@@ -48,11 +51,13 @@ rollout 명령 시간 초과와 실제 Deployment 실패 상태는 구분하여 
 ```powershell
 kubectl --context docker-desktop -n beaver-local describe deployment shop
 kubectl --context docker-desktop -n beaver-local rollout history deployment/shop
-kubectl --context docker-desktop -n beaver-local rollout undo deployment/shop --to-revision=<KNOWN_GOOD_REVISION>
+$goodRevision = 1 # 예시: history에서 확인한 실제 정상 revision 번호로 변경
+kubectl --context docker-desktop -n beaver-local rollout undo deployment/shop "--to-revision=$goodRevision"
 kubectl --context docker-desktop -n beaver-local rollout status deployment/shop --timeout=360s
 ```
 
 history에서 확인한 정상 revision 번호를 지정합니다. 무조건 직전 버전이 정상이라고 가정하지 않습니다.
+롤백 후에도 정상 이미지 주소를 app.yaml에 반영해야 다음 apply에서 실패 이미지가 다시 배포되지 않습니다.
 Deployment 롤백은 파드 템플릿만 되돌립니다. DB 데이터/스키마, ConfigMap/Secret 내용은 복구하지 않습니다.
 DB 비밀번호 변경이나 스키마 변경이 함께 있었다면 앱 버전 호환성을 별도로 확인합니다.
 ConfigMap/Secret을 환경변수로 주입하면 기존 파드 값은 자동 갱신되지 않습니다.

@@ -22,7 +22,6 @@ metadata:
   name: shop
   namespace: beaver
 spec:
-  replicas: 2
   revisionHistoryLimit: 3
   minReadySeconds: 10
   progressDeadlineSeconds: 300
@@ -40,6 +39,10 @@ spec:
         app: shop
     spec:
       terminationGracePeriodSeconds: 60
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
       topologySpreadConstraints:
         - maxSkew: 1
           topologyKey: topology.kubernetes.io/zone
@@ -56,6 +59,10 @@ spec:
       containers:
         - name: shop
           image: REPLACE_WITH_ECR_IMAGE_AND_TAG
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
           lifecycle:
             preStop:
               exec:
@@ -66,9 +73,25 @@ spec:
           envFrom:
             - configMapRef:
                 name: shop-config
-            - secretRef:
-                name: shop-secrets
           env:
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: shop-secrets
+                  key: DB_USER
+                  optional: false
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: shop-secrets
+                  key: DB_PASSWORD
+                  optional: false
+            - name: SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: shop-secrets
+                  key: SECRET_KEY
+                  optional: false
             - name: POD_NAME
               valueFrom:
                 fieldRef:
