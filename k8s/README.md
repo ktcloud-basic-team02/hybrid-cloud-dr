@@ -31,7 +31,8 @@ app.yaml, hpa.yaml, pdb.yaml, 설정한 Ingress 파일을 각각 kubectl apply -
 - preStop에서 10초 대기하고 종료 유예는 60초입니다. 무중단 보장은 아닙니다.
 - 파드는 비root UID/GID 10001로 실행하고 컨테이너 권한 상승과 Linux capabilities를 제한합니다.
   이미지의 앱 파일은 해당 계정이 읽을 수 있어야 하고 쓰기 경로가 있으면 별도 권한이 필요합니다.
-  이미지 내부 shop 사용자 UID가 10001이 아닐 수도 있으므로 파일 소유권 일치를 가정하지 않습니다.
+  Docker 이미지의 실행 사용자와 앱 파일 소유권도 UID/GID 10001로 통일했습니다.
+  shop:test 이미지로 로컬 Kubernetes 파드 실행, UID/GID 10001 및 사이트 접속을 확인했습니다.
   이 설정이 SECRET_KEY를 생성/암호화하는 것은 아닙니다. Secret 필수 참조는 별도로 유지합니다.
 - AZ/노드 분산은 선호 설정입니다. 실제 EKS 배치를 확인해야 합니다.
 - CPU/메모리 값과 HPA 범위는 초기값입니다. HPA가 노드를 늘리지는 않습니다.
