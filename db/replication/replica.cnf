@@ -1,0 +1,14 @@
+##############################
+# 2026-10-15 hyebin
+# 목적: EC2(Primary) -> 온프레미스 VM 간 "복제 동작 확인"용 설정
+#      (장애 전환/승격 기능까지는 포함 안 함, 단순 미러링 테스트)
+# 기존: bind-address = 127.0.0.1 (로컬만 허용)
+##############################
+
+[mysqld]
+#bind-address = 127.0.0.1
+bind-address = 0.0.0.0
+server-id = 1
+gtid_mode = ON
+enforce_gtid_consistency = ON
+binlog_format = ROW
