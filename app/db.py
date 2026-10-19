@@ -16,6 +16,9 @@ def get_conn():
         password=os.environ.get("DB_PASSWORD", "root"),
         database=os.environ.get("DB_NAME", "shop"),
         port=int(os.environ.get("DB_PORT", 3306)),
+        connect_timeout=3,
+        read_timeout=5,
+        write_timeout=5,
         charset="utf8mb4",
         cursorclass=pymysql.cursors.DictCursor
     )
