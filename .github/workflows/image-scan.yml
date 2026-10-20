@@ -6,7 +6,7 @@ on:
       - "app/**"
       - ".github/workflows/image-scan.yml"
   push:
-    branches: [ main ]
+    branches: [main]
     paths:
       - "app/**"
 
@@ -17,8 +17,7 @@ jobs:
   scan:
     runs-on: ubuntu-latest
     steps:
-      - name: 체크아웃
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Dockerfile 린트 (Hadolint)
         uses: hadolint/hadolint-action@v3.4.0
@@ -30,7 +29,7 @@ jobs:
         run: docker build --pull -t shop:${{ github.sha }} app/
 
       - name: 이미지 취약점 스캔 (Trivy)
-        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0 고정
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: shop:${{ github.sha }}
           severity: HIGH,CRITICAL
