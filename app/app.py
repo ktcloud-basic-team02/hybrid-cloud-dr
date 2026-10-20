@@ -1,5 +1,6 @@
-from flask import Flask, render_template, request, redirect, url_for, session, Response, jsonify, flash
+from flask import Flask, render_template, request, redirect, url_for, session, Response, jsonify, flash, abort
 import db
+import hmac
 import os
 import socket
 import logging
@@ -16,6 +17,12 @@ SECRET_KEY = os.environ.get("SECRET_KEY")
 if not SECRET_KEY:
     raise RuntimeError("SECRET_KEY 환경변수가 설정되지 않았습니다.")
 app.secret_key = SECRET_KEY
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax",
+    # HTTPS 앞단(ALB/Ingress TLS)을 붙인 뒤에만 true로 켬
+    SESSION_COOKIE_SECURE=os.environ.get("SESSION_COOKIE_SECURE", "false").lower() == "true",
+)
 SERVER_ENV = os.environ.get("SERVER_ENV", "aws").strip().lower()
 if SERVER_ENV not in {"aws", "onprem"}:
     raise ValueError("SERVER_ENV must be aws or onprem")
@@ -27,6 +34,9 @@ NODE_NAME = os.environ.get("NODE_NAME", "")
 SHOW_POD = bool(os.environ.get("POD_NAME") or os.environ.get("KUBERNETES_SERVICE_HOST"))
 
 RESET_ENABLED = os.environ.get("ENABLE_RESET", "false").lower() == "true"
+RESET_TOKEN = os.environ.get("RESET_TOKEN", "")
+if RESET_ENABLED and not RESET_TOKEN:
+    raise RuntimeError("ENABLE_RESET=true 이면 RESET_TOKEN 환경변수도 필요합니다.")
 
 SERVICE_MODE = os.environ.get("SERVICE_MODE", "standby").strip().lower()
 if SERVICE_MODE not in {"active", "standby"}:
@@ -86,10 +96,11 @@ def products():
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
-        username = request.form.get("username")
-        password = request.form.get("password")
-        user = db.check_user(username, password)
+        username = (request.form.get("username") or "").strip()
+        password = request.form.get("password") or ""
+        user = db.check_user(username, password) if username and password else None
         if user:
+            session.clear()
             session["user_id"] = user["id"]
             session["username"] = user["username"]
             return redirect(url_for("products"))
@@ -100,8 +111,10 @@ def login():
 @app.route("/signup", methods=["GET", "POST"])
 def signup():
     if request.method == "POST":
-        username = request.form.get("username")
-        password = request.form.get("password")
+        username = (request.form.get("username") or "").strip()
+        password = request.form.get("password") or ""
+        if not username or not password:
+            return render_template("signup.html", error="아이디와 비밀번호를 입력해 주세요.")
         success = db.create_user(username, password)
         if success:
             return redirect(url_for("login"))
@@ -142,7 +155,10 @@ def cart_add(pid):
 def cart_update(pid):
     if "user_id" not in session:
         return redirect(url_for("login"))
-    qty = int(request.form.get("qty", 0))
+    try:
+        qty = int(request.form.get("qty", 0))
+    except ValueError:
+        return redirect(url_for("cart"))
     cart = dict(session.get("cart", {}))
     if qty <= 0:
         cart.pop(str(pid), None)
@@ -174,6 +190,10 @@ def order_complete(oid):
     if "user_id" not in session:
         return redirect(url_for("login"))
     o = db.get_order(oid)
+    # 존재 여부가 드러나지 않게, 없는 주문과 남의 주문을 똑같이 404로 처리
+    if o is None or o.get("user_id") != session["user_id"]:
+        logging.warning("order access denied oid=%s user=%s", oid, session["user_id"])
+        abort(404)
     return render_template("order.html", o=o)
 
 
@@ -181,6 +201,10 @@ def order_complete(oid):
 def api_reset():
     if not RESET_ENABLED:
         return jsonify({"status": "fail", "message": "Reset is disabled."}), 403
+    token = request.headers.get("X-Reset-Token", "")
+    if not hmac.compare_digest(token, RESET_TOKEN):
+        logging.warning("reset rejected: invalid token")
+        return jsonify({"status": "fail", "message": "Forbidden."}), 403
     success = db.reset_db()
     if success:
         return jsonify({"status": "success", "message": "Database reset successfully."})
@@ -198,7 +222,8 @@ def health():
         return {"env": SERVER_ENV, "mode": SERVICE_MODE, "status": "standby"}, 503
     try:
         db.ping()
-    except Exception:
+    except Exception as e:
+        logging.warning("health check: DB ping failed (%s)", e)
         return {"env": SERVER_ENV, "mode": SERVICE_MODE, "status": "down"}, 503
     return {"env": SERVER_ENV, "pod": POD_NAME, "mode": SERVICE_MODE, "status": "ok"}
 
