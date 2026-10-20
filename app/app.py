@@ -189,10 +189,10 @@ def checkout():
 def order_complete(oid):
     if "user_id" not in session:
         return redirect(url_for("login"))
-    o = db.get_order(oid)
-    # 존재 여부가 드러나지 않게, 없는 주문과 남의 주문을 똑같이 404로 처리
-    if o is None or o.get("user_id") != session["user_id"]:
-        logging.warning("order access denied oid=%s user=%s", oid, session["user_id"])
+    # 본인 주문만 조회됨. 없는 주문과 남의 주문을 똑같이 404로 처리해 존재 여부가 드러나지 않게 함
+    o = db.get_order(oid, session["user_id"])
+    if o is None:
+        logging.warning("order not found or not owned oid=%s user=%s", oid, session["user_id"])
         abort(404)
     return render_template("order.html", o=o)
 
