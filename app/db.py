@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import pymysql
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -8,19 +9,34 @@ SHIPPING_FEE = 3000
 STOCK_NORMAL = 30
 STOCK_LIMITED = 1
 
+log = logging.getLogger(__name__)
+
+
+def _required(name):
+    value = os.environ.get(name)
+    if not value:
+        raise RuntimeError(f"{name} 환경변수가 설정되지 않았습니다.")
+    return value
+
+
+# 코드에 기본 계정을 두지 않음 (퍼블릭 레포)
+DB_USER = _required("DB_USER")
+DB_PASSWORD = _required("DB_PASSWORD")
+
 
 def get_conn():
     return pymysql.connect(
         host=os.environ.get("DB_HOST", "localhost"),
-        user=os.environ.get("DB_USER", "root"),
-        password=os.environ.get("DB_PASSWORD", "root"),
+        user=DB_USER,
+        password=DB_PASSWORD,
         database=os.environ.get("DB_NAME", "shop"),
         port=int(os.environ.get("DB_PORT", 3306)),
-        connect_timeout=3,
-        read_timeout=5,
-        write_timeout=5,
         charset="utf8mb4",
-        cursorclass=pymysql.cursors.DictCursor
+        cursorclass=pymysql.cursors.DictCursor,
+        # DB가 응답하지 않을 때 요청과 헬스체크가 오래 매달리지 않게 함
+        connect_timeout=int(os.environ.get("DB_CONNECT_TIMEOUT", 3)),
+        read_timeout=int(os.environ.get("DB_READ_TIMEOUT", 10)),
+        write_timeout=int(os.environ.get("DB_WRITE_TIMEOUT", 10))
     )
 
 
@@ -54,9 +70,13 @@ def create_user(username, password):
             )
         conn.commit()
         return True
-    except Exception:
+    except pymysql.err.IntegrityError:
         conn.rollback()
         return False
+    except Exception:
+        conn.rollback()
+        log.exception("create_user failed")
+        raise
     finally:
         conn.close()
 
@@ -153,9 +173,10 @@ def place_order(user_id, cart, server_env):
             order_id = _save_order(cur, user_id, order_items, total, "success", server_env)
         conn.commit()
         return order_id, None
-    except Exception as e:
+    except Exception:
         conn.rollback()
-        return None, str(e)
+        log.exception("place_order failed user=%s", user_id)
+        return None, "일시적인 오류로 주문하지 못했어요. 잠시 후 다시 시도해 주세요."
     finally:
         conn.close()
 
@@ -171,11 +192,11 @@ def _to_order(o):
     }
 
 
-def get_order(order_id):
+def get_order(order_id, user_id):
     conn = get_conn()
     try:
         with conn.cursor() as cur:
-            cur.execute("SELECT * FROM orders WHERE id = %s", (order_id,))
+            cur.execute("SELECT * FROM orders WHERE id = %s AND user_id = %s", (order_id, user_id))
             o = cur.fetchone()
         return _to_order(o) if o else None
     finally:
