@@ -58,7 +58,8 @@ spec:
               app: shop
       containers:
         - name: shop
-          image: REPLACE_WITH_ECR_IMAGE_AND_TAG
+          image: 757517308178.dkr.ecr.ap-northeast-2.amazonaws.com/beaver-app:latest
+ 	  imagePullPolicy: Always
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
