@@ -58,8 +58,8 @@ spec:
               app: shop
       containers:
         - name: shop
-          image: 757517308178.dkr.ecr.ap-northeast-2.amazonaws.com/beaver-app:latest
- 	  imagePullPolicy: Always
+          image: 757517308178.dkr.ecr.ap-northeast-2.amazonaws.com/beaver-app:shop-fc188ed-20261020-105550
+          imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
