@@ -22,7 +22,7 @@ curl -fsSL https://tailscale.com/install.sh | sh
 
 # 5-1 TailScale 설치 후 새 인증키로 IP할당 받기
 sudo systemctl enable --now tailscaled
-sudo tailscale up --authkey="tskey-auth-key" --hostname="$(hostname)"
+sudo tailscale up --authkey="tskey-auth-kENo2NNQFv11CNTRL-aqDrKe6vsYADkV5zjktRYAqxsuLH6Eyd" --hostname="$(hostname)"
 tailscale ip -4
 
 # 5-2 Tailscale 새 인스턴스에 적용시 사용
@@ -30,7 +30,7 @@ sudo systemctl stop tailscaled
 sudo rm -f /var/lib/tailscale/tailscaled.state
 sudo systemctl start tailscaled
 sleep 5
-sudo tailscale up --authkey="tskey-auth-key" --hostname="$(hostname)" --force-reauth
+sudo tailscale up --authkey="tskey-auth-kENo2NNQFv11CNTRL-aqDrKe6vsYADkV5zjktRYAqxsuLH6Eyd" --hostname="$(hostname)" --force-reauth
 
 # 6. 설치 후 버전확인
 docker --version
