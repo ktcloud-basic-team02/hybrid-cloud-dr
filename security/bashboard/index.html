@@ -1,0 +1,364 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Beaver Infra Dashboard</title>
+<style>
+  :root {
+    --bg:#0a0e14; --panel:#121923; --panel2:#17202c; --line:#223044;
+    --text:#e6edf5; --muted:#8497ad; --accent:#2dd4bf; --accent2:#60a5fa;
+    --ok:#34d399; --warn:#fbbf24; --bad:#f87171;
+    --ok-bg:rgba(52,211,153,.12); --warn-bg:rgba(251,191,36,.12); --bad-bg:rgba(248,113,113,.12);
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text);
+         font:14px/1.5 -apple-system,"Segoe UI","Noto Sans KR",sans-serif; }
+  .wrap { max-width:1280px; margin:0 auto; padding:20px 20px 28px; }
+
+  header { display:flex; flex-wrap:wrap; align-items:center; gap:14px 24px; padding:18px 22px;
+           background:linear-gradient(135deg,#132033,#0f1823); border:1px solid var(--line); border-radius:16px; }
+  .logo { width:44px; height:44px; border-radius:12px; display:grid; place-items:center; flex:none;
+          background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#04121a; font-weight:800; font-size:20px; }
+  header h1 { margin:0; font-size:20px; line-height:1.2; }
+  .tags { display:flex; flex-wrap:wrap; gap:6px 8px; margin-top:6px; }
+  .tag { font-size:12px; padding:2px 10px; border-radius:999px; background:var(--panel2);
+         border:1px solid var(--line); color:var(--muted); }
+  .tag b { color:var(--text); font-weight:600; }
+  .live { margin-left:auto; display:flex; align-items:center; gap:8px; color:var(--muted); font-size:13px; }
+  .dot { width:9px; height:9px; border-radius:50%; background:var(--bad); }
+  .dot.on { background:var(--ok); animation:pulse 2s infinite; }
+  @keyframes pulse { 0%{box-shadow:0 0 0 0 rgba(52,211,153,.5)} 70%{box-shadow:0 0 0 7px rgba(52,211,153,0)} 100%{box-shadow:0 0 0 0 rgba(52,211,153,0)} }
+
+  .err { display:none; margin:12px 0 0; padding:8px 12px; border-radius:10px; color:var(--bad); background:var(--bad-bg); }
+
+  .grid { display:grid; gap:16px; margin-top:16px; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:18px; }
+  .wide { grid-column:1/-1; }
+  .head { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
+  h2 { margin:0; font-size:12px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); }
+  .pill { font-size:11px; font-weight:700; padding:2px 10px; border-radius:999px; background:var(--ok-bg); color:var(--ok); }
+  .pill.warn { background:var(--warn-bg); color:var(--warn); }
+  .pill.bad { background:var(--bad-bg); color:var(--bad); }
+
+  .svc-list { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:10px; margin-top:10px; }
+  .svc { display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:12px;
+         background:var(--panel2); border:1px solid var(--line); }
+  .sdot { width:9px; height:9px; border-radius:50%; background:var(--muted); flex:none; }
+  .sname { font-weight:600; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .sst { font-size:11px; font-weight:700; color:var(--muted); }
+  .svc.active { background:var(--ok-bg); border-color:transparent; }
+  .svc.active .sdot { background:var(--ok); } .svc.active .sst { color:var(--ok); }
+  .svc.failed, .svc.inactive { background:var(--bad-bg); border-color:transparent; }
+  .svc.failed .sdot, .svc.inactive .sdot { background:var(--bad); }
+  .svc.failed .sst, .svc.inactive .sst { color:var(--bad); }
+  .svc.missing { opacity:.55; }
+
+  .gauge { position:relative; width:150px; height:150px; margin:8px auto 4px; }
+  .gauge svg { width:100%; height:100%; transform:rotate(-90deg); }
+  .trk { fill:none; stroke:var(--panel2); stroke-width:10; }
+  .prg { fill:none; stroke:var(--ok); stroke-width:10; stroke-linecap:round;
+         stroke-dasharray:0 327; transition:stroke-dasharray .6s ease, stroke .3s; }
+  .gv { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+  .big { font-size:28px; font-weight:700; font-variant-numeric:tabular-nums; }
+  .sub { color:var(--muted); font-size:12px; text-align:center; }
+
+  svg.spark { width:100%; height:56px; display:block; margin-top:10px; }
+  .cores { display:grid; grid-template-columns:repeat(auto-fill,minmax(64px,1fr)); gap:8px; margin-top:12px; }
+  .core { font-size:11px; color:var(--muted); }
+  .bar { height:6px; background:var(--panel2); border-radius:4px; overflow:hidden; margin-top:3px; }
+  .bar > i { display:block; height:100%; width:0; background:var(--ok); transition:width .4s, background .4s; }
+  .rows { display:grid; grid-template-columns:auto 1fr; gap:8px 16px; margin:12px 0 0; padding-top:12px; border-top:1px solid var(--line); }
+  .rows dt { color:var(--muted); } .rows dd { margin:0; text-align:right; font-weight:600; font-variant-numeric:tabular-nums; }
+  .two { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin:10px 0 4px; }
+  .box { background:var(--panel2); border-radius:12px; padding:12px; }
+  .box .lbl { font-size:12px; color:var(--muted); }
+  .box .val { font-size:20px; font-weight:700; font-variant-numeric:tabular-nums; }
+
+  .seg { display:inline-flex; border:1px solid var(--line); border-radius:10px; overflow:hidden; }
+  .seg button { border:0; background:var(--panel2); color:var(--muted); padding:5px 14px; font:inherit; font-weight:600; cursor:pointer; }
+  .seg button.on { background:var(--accent); color:#04121a; }
+  .tbl { overflow-x:auto; }
+  table { width:100%; border-collapse:collapse; font-family:ui-monospace,Consolas,monospace; font-size:13px; }
+  th { text-align:left; color:var(--muted); font-weight:600; padding:6px 10px; border-bottom:1px solid var(--line); white-space:nowrap; }
+  td { padding:6px 10px; border-bottom:1px solid var(--line); white-space:nowrap; }
+  .num { text-align:right; font-variant-numeric:tabular-nums; } th.num { text-align:right; }
+  tr.hot td { background:var(--warn-bg); font-weight:700; }
+  .hint { color:var(--muted); font-size:12px; margin-top:8px; }
+  footer { text-align:center; color:var(--muted); font-size:12px; padding-top:18px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="logo">B</div>
+  <div>
+    <h1 id="host">Instance</h1>
+    <div class="tags">
+      <span class="tag">OS <b id="os">–</b></span>
+      <span class="tag">Kernel <b id="kernel">–</b></span>
+      <span class="tag">Tailscale <b id="tsip">–</b></span>
+      <span class="tag"><b id="tz">–</b></span>
+      <span class="tag" id="uptime">가동 –</span>
+      <span class="tag">접속자 <b id="userCount">–</b></span>
+    </div>
+  </div>
+  <div class="live"><span class="dot" id="dot"></span><span id="updated">연결 중…</span></div>
+</header>
+
+<div class="err" id="err">서버에서 데이터를 가져오지 못했습니다. 재시도 중…</div>
+
+<div class="grid">
+  <section class="card wide">
+    <h2>서비스 상태</h2>
+    <div class="svc-list" id="svcList"></div>
+  </section>
+
+  <section class="card">
+    <div class="head"><h2>CPU</h2><span class="pill" id="cpuPill">정상</span></div>
+    <div class="gauge">
+      <svg viewBox="0 0 120 120"><circle class="trk" cx="60" cy="60" r="52"/><circle class="prg" id="cpuBar" cx="60" cy="60" r="52"/></svg>
+      <div class="gv"><div class="big" id="cpu">–</div><div class="sub" id="cpuSub"></div></div>
+    </div>
+    <svg class="spark" id="cpuSpark" viewBox="0 0 300 56" preserveAspectRatio="none"></svg>
+    <div class="cores" id="cores"></div>
+  </section>
+
+  <section class="card">
+    <div class="head"><h2>메모리</h2><span class="pill" id="memPill">정상</span></div>
+    <div class="gauge">
+      <svg viewBox="0 0 120 120"><circle class="trk" cx="60" cy="60" r="52"/><circle class="prg" id="memBar" cx="60" cy="60" r="52"/></svg>
+      <div class="gv"><div class="big" id="mem">–</div><div class="sub" id="memSub"></div></div>
+    </div>
+    <svg class="spark" id="memSpark" viewBox="0 0 300 56" preserveAspectRatio="none"></svg>
+    <dl class="rows"><dt>스왑</dt><dd id="swap">–</dd></dl>
+  </section>
+
+  <section class="card">
+    <div class="head"><h2>디스크 (/)</h2><span class="pill" id="diskPill">정상</span></div>
+    <div class="gauge">
+      <svg viewBox="0 0 120 120"><circle class="trk" cx="60" cy="60" r="52"/><circle class="prg" id="diskBar" cx="60" cy="60" r="52"/></svg>
+      <div class="gv"><div class="big" id="disk">–</div><div class="sub" id="diskSub"></div></div>
+    </div>
+    <dl class="rows">
+      <dt>Load Average</dt><dd id="load">–</dd>
+      <dt>프로세스 수</dt><dd id="procs">–</dd>
+    </dl>
+  </section>
+
+  <section class="card">
+    <div class="head"><h2>네트워크</h2></div>
+    <div class="two">
+      <div class="box"><div class="lbl">수신 ↓</div><div class="val" id="rx">–</div></div>
+      <div class="box"><div class="lbl">송신 ↑</div><div class="val" id="tx">–</div></div>
+    </div>
+    <svg class="spark" id="netSpark" viewBox="0 0 300 56" preserveAspectRatio="none"></svg>
+    <dl class="rows">
+      <dt>누적 수신</dt><dd id="rxTotal">–</dd>
+      <dt>누적 송신</dt><dd id="txTotal">–</dd>
+    </dl>
+  </section>
+
+  <section class="card">
+    <div class="head"><h2>MySQL (RDS)</h2><span class="pill" id="myPill">정상</span></div>
+    <div class="two">
+      <div class="box"><div class="lbl">초당 쿼리</div><div class="val" id="myQps">–</div></div>
+      <div class="box"><div class="lbl">현재 연결</div><div class="val" id="myConn">–</div></div>
+    </div>
+    <svg class="spark" id="mySpark" viewBox="0 0 300 56" preserveAspectRatio="none"></svg>
+    <dl class="rows">
+      <dt>버전</dt><dd id="myVer">–</dd>
+      <dt>가동 시간</dt><dd id="myUp">–</dd>
+      <dt>실행 중 스레드</dt><dd id="myRun">–</dd>
+      <dt>슬로우 쿼리</dt><dd id="mySlow">–</dd>
+      <dt>연결 실패</dt><dd id="myAbort">–</dd>
+    </dl>
+  </section>
+
+  <section class="card wide">
+    <div class="head"><h2>현재 접속자 (SSH)</h2><span class="pill" id="userPill">0명</span></div>
+    <div class="tbl"><table>
+      <thead><tr><th>USER</th><th>TTY</th><th>FROM</th><th>LOGIN</th><th class="num">경과</th></tr></thead>
+      <tbody id="userBody"><tr><td colspan="5">불러오는 중…</td></tr></tbody>
+    </table></div>
+  </section>
+
+  <section class="card wide">
+    <div class="head">
+      <div><h2>프로세스 (top)</h2><div class="sub" id="procSum" style="text-align:left"></div></div>
+      <div class="seg">
+        <button class="on" data-k="cpu" onclick="setSort('cpu')">CPU순</button>
+        <button data-k="mem" onclick="setSort('mem')">메모리순</button>
+      </div>
+    </div>
+    <div class="tbl"><table>
+      <thead><tr><th>PID</th><th>USER</th><th class="num">%CPU</th><th class="num">%MEM</th><th class="num">RES</th><th>COMMAND</th></tr></thead>
+      <tbody id="procBody"><tr><td colspan="6">불러오는 중…</td></tr></tbody>
+    </table></div>
+    <div class="hint">%CPU는 코어 1개 기준입니다 (2 vCPU면 최대 200%). 강조 행: CPU 50% 이상 또는 메모리 20% 이상</div>
+  </section>
+</div>
+
+<footer>Beaver Team Infra5 · 2초마다 자동 갱신</footer>
+</div>
+
+<script>
+const POLL_MS = 2000, HISTORY = 60, CIRC = 2 * Math.PI * 52;
+const hist = { cpu: [], mem: [], net: [], qps: [] };
+let prevQ = null, prevNet = null, sortKey = "cpu", lastProcs = [];
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c]));
+
+function fmtBytes(n) {
+  const u = ["B","KB","MB","GB","TB"]; let i = 0;
+  while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; }
+  return n.toFixed(n >= 100 || i === 0 ? 0 : 1) + " " + u[i];
+}
+const fmtRate = n => fmtBytes(n) + "/s";
+function fmtUptime(sec) {
+  const d = Math.floor(sec/86400), h = Math.floor(sec%86400/3600), m = Math.floor(sec%3600/60);
+  return (d ? d + "일 " : "") + h + "시간 " + m + "분";
+}
+const level = p => p >= 90 ? "var(--bad)" : p >= 70 ? "var(--warn)" : "var(--ok)";
+
+function setRing(id, p) {
+  const el = $(id);
+  el.style.strokeDasharray = (CIRC * Math.min(100, p) / 100).toFixed(1) + " " + CIRC.toFixed(1);
+  el.style.stroke = level(p);
+}
+function setPill(id, p) {
+  const el = $(id);
+  el.className = "pill" + (p >= 90 ? " bad" : p >= 70 ? " warn" : "");
+  el.textContent = p >= 90 ? "위험" : p >= 70 ? "주의" : "정상";
+}
+function spark(id, data, max) {
+  const svg = $(id);
+  if (data.length < 2) { svg.innerHTML = ""; return; }
+  const top = max || Math.max(...data, 1), step = 300 / (HISTORY - 1), off = (HISTORY - data.length) * step;
+  const pts = data.map((v, i) => `${(off + i*step).toFixed(1)},${(54 - (v/top)*50).toFixed(1)}`);
+  svg.innerHTML =
+    `<polygon fill="var(--accent)" opacity=".15" points="${off.toFixed(1)},56 ${pts.join(" ")} 300,56"/>` +
+    `<polyline fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" points="${pts.join(" ")}"/>`;
+}
+function push(arr, v) { arr.push(v); if (arr.length > HISTORY) arr.shift(); }
+
+function renderMysql(s) {
+  const m = s.mysql, pill = $("myPill");
+  if (!m.ok) {
+    pill.className = "pill bad"; pill.textContent = "미연결";
+    ["myQps","myConn","myVer","myUp","myRun","mySlow","myAbort"].forEach(k => $(k).textContent = "–");
+    return;
+  }
+  const pct = m.max_connections ? m.threads_connected / m.max_connections * 100 : 0;
+  setPill("myPill", pct);
+  $("myConn").textContent = `${m.threads_connected} / ${m.max_connections}`;
+  $("myVer").textContent = m.version;
+  $("myUp").textContent = fmtUptime(m.uptime);
+  $("myRun").textContent = m.threads_running;
+  $("mySlow").textContent = m.slow_queries.toLocaleString();
+  $("myAbort").textContent = m.aborted_connects.toLocaleString();
+  if (prevQ && s.time > prevQ.time && m.questions >= prevQ.q) {
+    const qps = (m.questions - prevQ.q) / (s.time - prevQ.time);
+    $("myQps").textContent = qps.toFixed(1);
+    push(hist.qps, qps); spark("mySpark", hist.qps);
+  }
+  prevQ = { time: s.time, q: m.questions };
+}
+
+function renderUsers(list, now) {
+  $("userCount").textContent = list.length + "명";
+  $("userPill").textContent = list.length + "명";
+  $("userBody").innerHTML = list.length ? list.map(u =>
+    `<tr><td>${esc(u.name)}</td><td>${esc(u.terminal || "–")}</td><td>${esc(u.host || "–")}</td>` +
+    `<td>${new Date(u.started*1000).toLocaleString("ko-KR")}</td><td class="num">${fmtUptime(Math.max(0, now - u.started))}</td></tr>`
+  ).join("") : '<tr><td colspan="5">접속 중인 세션이 없습니다</td></tr>';
+}
+
+const SVC_TEXT = { active:"정상", failed:"오류", inactive:"중지", missing:"미설치" };
+function renderServices(list) {
+  $("svcList").innerHTML = list.map(v =>
+    `<div class="svc ${v.status}"><span class="sdot"></span><span class="sname">${esc(v.name)}</span><span class="sst">${SVC_TEXT[v.status] || v.status}</span></div>`
+  ).join("");
+}
+
+function renderProcs() {
+  const rows = [...lastProcs].sort((a, b) => b[sortKey] - a[sortKey]).slice(0, 10);
+  $("procBody").innerHTML = rows.map(p =>
+    `<tr class="${p.cpu >= 50 || p.mem >= 20 ? "hot" : ""}"><td>${p.pid}</td><td>${esc(p.user)}</td>` +
+    `<td class="num">${p.cpu.toFixed(1)}</td><td class="num">${p.mem.toFixed(1)}</td>` +
+    `<td class="num">${fmtBytes(p.rss)}</td><td title="${esc(p.cmd)}">${esc(p.name)}</td></tr>`
+  ).join("");
+}
+function setSort(k) {
+  sortKey = k;
+  document.querySelectorAll(".seg button").forEach(b => b.classList.toggle("on", b.dataset.k === k));
+  renderProcs();
+}
+
+function render(s) {
+  $("host").textContent = s.hostname;
+  $("os").textContent = s.os;
+  $("kernel").textContent = s.kernel || "–";
+  $("tsip").textContent = s.ts_ip || "미연결";
+  $("tz").textContent = s.tz || "–";
+  $("uptime").textContent = "가동 " + fmtUptime(s.time - s.boot_time);
+
+  $("cpu").textContent = s.cpu_percent.toFixed(1) + "%";
+  $("cpuSub").textContent = s.cpu_count + " vCPU";
+  setRing("cpuBar", s.cpu_percent); setPill("cpuPill", s.cpu_percent);
+  push(hist.cpu, s.cpu_percent); spark("cpuSpark", hist.cpu, 100);
+  $("cores").innerHTML = s.cpu_per_core.map((p, i) =>
+    `<div class="core">core ${i} · ${p.toFixed(0)}%<div class="bar"><i style="width:${p}%;background:${level(p)}"></i></div></div>`
+  ).join("");
+
+  $("mem").textContent = s.mem.percent.toFixed(1) + "%";
+  $("memSub").textContent = fmtBytes(s.mem.used) + " / " + fmtBytes(s.mem.total);
+  setRing("memBar", s.mem.percent); setPill("memPill", s.mem.percent);
+  push(hist.mem, s.mem.percent); spark("memSpark", hist.mem, 100);
+  $("swap").textContent = s.swap.total ? `${fmtBytes(s.swap.used)} / ${fmtBytes(s.swap.total)}` : "없음";
+
+  $("disk").textContent = s.disk.percent.toFixed(1) + "%";
+  $("diskSub").textContent = fmtBytes(s.disk.used) + " / " + fmtBytes(s.disk.total);
+  setRing("diskBar", s.disk.percent); setPill("diskPill", s.disk.percent);
+  $("load").textContent = s.load.map(v => v.toFixed(2)).join(" / ");
+  $("procs").textContent = s.process_count;
+
+  if (s.services) renderServices(s.services);
+  if (s.mysql) renderMysql(s);
+  if (s.users) renderUsers(s.users, s.time);
+  if (s.top) {
+    lastProcs = s.top;
+    $("procSum").textContent = `Tasks ${s.process_count} · Load ${s.load.map(v => v.toFixed(2)).join(" ")}`;
+    renderProcs();
+  }
+
+  if (prevNet && s.time > prevNet.time) {
+    const dt = s.time - prevNet.time;
+    const rx = Math.max(0, (s.net.recv - prevNet.recv) / dt), tx = Math.max(0, (s.net.sent - prevNet.sent) / dt);
+    $("rx").textContent = fmtRate(rx); $("tx").textContent = fmtRate(tx);
+    push(hist.net, rx + tx); spark("netSpark", hist.net);
+  }
+  prevNet = { time: s.time, recv: s.net.recv, sent: s.net.sent };
+  $("rxTotal").textContent = fmtBytes(s.net.recv);
+  $("txTotal").textContent = fmtBytes(s.net.sent);
+}
+
+async function tick() {
+  try {
+    const r = await fetch("/api/stats", { cache: "no-store" });
+    if (!r.ok) throw new Error(r.status);
+    render(await r.json());
+    $("dot").classList.add("on");
+    $("err").style.display = "none";
+    $("updated").textContent = new Date().toLocaleTimeString("ko-KR");
+  } catch (e) {
+    $("dot").classList.remove("on");
+    $("err").style.display = "block";
+  }
+}
+tick();
+setInterval(tick, POLL_MS);
+</script>
+</body>
+</html>
