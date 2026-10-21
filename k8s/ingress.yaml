@@ -1,15 +1,14 @@
-# Template only: choose the installed NGINX controller's IngressClass first.
-# This creates an app routing rule, not an ALB or an Ingress controller.
+# ALB(80) -> ingress-nginx NodePort(30887) -> 이 Ingress -> Service shop:80 -> Pod:5000
+# host 없음: ALB 기본 주소로 바로 접속 가능. 도메인 확정 후 host 추가.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: shop
   namespace: beaver
 spec:
-  ingressClassName: REPLACE_WITH_INGRESS_CLASS
+  ingressClassName: nginx   # kubectl get ingressclass 결과와 동일해야 함
   rules:
-    - host: shop.example.com
-      http:
+    - http:
         paths:
           - path: /
             pathType: Prefix

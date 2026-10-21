@@ -9,7 +9,7 @@ spec:
     kind: Deployment
     name: shop
   minReplicas: 2
-  maxReplicas: 6
+  maxReplicas: 4
   metrics:
     - type: Resource
       resource:
