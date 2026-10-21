@@ -93,4 +93,7 @@ kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/cont
 - SSH 접속시 EC2에 설치된 패키지 버전 정보 표시
 - SSH 접속시 먼저 아이디 및 비밀번호를 물어보도록 설정
 - 실패한 SSH 시도, 마지막 접속 IP 방식, 패스워드 만료 예정일(7일이내만 표시), 최근 변경된 중요 24시간내 변경된것만 파일 최대 3개
+- 마지막 접속 IP 방식에서 -> 시간 + 접속 계정 + 방식, 다른대역에서 접속시만 강조되도록 변경
+
+- 
  
