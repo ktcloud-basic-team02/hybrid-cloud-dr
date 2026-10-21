@@ -3,25 +3,25 @@
 | 파일 | 역할 |
 | --- | --- |
 | app.yaml | 앱 Deployment, ConfigMap, Service, namespace |
-| hpa.yaml | CPU 목표 60%, 파드 2~6개 |
-| ingress.example.yaml | NGINX를 통해 shop Service로 연결하는 접속 규칙 |
+| hpa.yaml | CPU 목표 60%, 파드 2~4개 |
+| ingress.yaml | NGINX를 통해 shop Service로 연결하는 접속 규칙 (beaver-shop.cloud + ALB 기본 주소) |
 | pdb.yaml | 계획된 파드 퇴거 시 최소 가용 파드 1개 보호 |
-| secrets.env.example | DB_USER, DB_PASSWORD, SECRET_KEY 입력 항목 |
+| secrets.env.example | 입력 항목 예시 (현재 app.yaml은 shop-db-secret, shop-session-secret을 참조) |
 | ROLLOUT.md | 기존 업데이트·롤백 참고 절차 |
 
 ## 적용 전
 
 1. 실제 kubectl context를 확인합니다.
-2. app.yaml의 이미지와 DB 주소를 실제 값으로 바꿉니다. PR #3의 Gunicorn 이미지를 사용합니다.
+2. app.yaml의 이미지를 실제 값으로 바꿉니다. PR #3의 Gunicorn 이미지를 사용합니다. DB 접속 정보는 ConfigMap이 아니라 shop-db-secret으로 주입합니다.
 3. beaver namespace를 생성하고 shop-secrets를 준비합니다.
-   DB_USER/DB_PASSWORD/SECRET_KEY 세 키가 필수입니다. 모든 파드에서 같은 임의 세션 키를 사용합니다.
+   shop-db-secret(DB 접속 정보 키 전체가 환경변수로 주입됨)과 shop-session-secret(SECRET_KEY)이 필수입니다. 모든 파드에서 같은 임의 세션 키를 사용합니다.
    실제 값은 Git에 올리지 않습니다. secrets.env는 Git 제외입니다.
 4. HPA용 Metrics Server, IngressClass에 맞는 컨트롤러가 필요합니다.
-5. Ingress의 클래스와 도메인을 실제 값으로 변경합니다. 로컬에서 확인한 값은 nginx, shop.localhost입니다.
+5. ingress.yaml의 ingressClassName이 `kubectl get ingressclass` 결과와 같은지 확인합니다. 로컬은 nginx, shop.localhost를 사용했습니다.
 
 app.yaml, hpa.yaml, pdb.yaml, 설정한 Ingress 파일을 각각 kubectl apply -f로 적용합니다.
 로컬에서는 namespace를 beaver-local로 바꾼 복사본을 사용하며 원본의 EKS 초안과 구분합니다.
-폴더 전체를 무조건 apply하지 않습니다. Ingress 자리표시자가 남아 있으면 적용하지 않습니다.
+폴더 전체를 무조건 apply하지 않습니다. 필요한 Secret이 없으면 파드가 CreateContainerConfigError로 멈춥니다.
 
 ## 알아둘 점
 
@@ -39,7 +39,8 @@ app.yaml, hpa.yaml, pdb.yaml, 설정한 Ingress 파일을 각각 kubectl apply -
   정상 파드가 1개뿐이면 해당 파드의 drain이 대기할 수 있습니다.
   Deployment 롤링 업데이트는 PDB가 아닌 maxUnavailable/maxSurge 설정으로 제어됩니다.
 - Secret/ConfigMap 변경은 실행 중 앱 환경변수에 자동 반영되지 않으므로 파드 교체가 필요합니다.
-- 실제 ALB, TLS, 도메인, DB 장애 전환 연결 방식은 환경 확정 후 반영합니다.
+- 접속 경로: Route53(beaver-shop.cloud, A 별칭) → ALB(80은 443 리다이렉트, 443은 ACM 인증서) → 대상그룹(ingress-nginx NodePort 30887) → Ingress → shop Service.
+- DB 장애 전환 연결 방식은 환경 확정 후 반영합니다.
 - 앱 DB 타임아웃과 주문 재시도 중복 방지는 개발 담당과 별도 조정합니다.
 
 ## 확인 상태

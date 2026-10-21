@@ -1,5 +1,6 @@
-# ALB(80) -> ingress-nginx NodePort(30887) -> 이 Ingress -> Service shop:80 -> Pod:5000
-# host 없음: ALB 기본 주소로 바로 접속 가능. 도메인 확정 후 host 추가.
+# 도메인 연결 후 적용용 (ingress.yaml 대체)
+# - beaver-shop.cloud 로 접속 가능
+# - host 없는 규칙을 함께 둬서 ALB 기본 주소로도 계속 접속 가능
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -8,6 +9,16 @@ metadata:
 spec:
   ingressClassName: nginx   # kubectl get ingressclass 결과와 동일해야 함
   rules:
+    - host: beaver-shop.cloud
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: shop
+                port:
+                  number: 80
     - http:
         paths:
           - path: /
