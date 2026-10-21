@@ -88,3 +88,9 @@ kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/cont
 - 임시 비밀번호, Tailscale 인증키는 저장소에 올리지 않고 폐기/교체
 - 로드밸런서(NLB)는 시간당 요금 발생, 테스트 후 서비스 삭제로 정리
 - ALB 사용 여부는 팀 설계 확정 후 AWS Load Balancer Controller 도입 검토
+
+## 5. EC2 팀원 전체 유저 등록 및 로그인 방식으로 변경. 로그인시 각종 이력들 뜨도록 설정
+- SSH 접속시 EC2에 설치된 패키지 버전 정보 표시
+- SSH 접속시 먼저 아이디 및 비밀번호를 물어보도록 설정
+- 실패한 SSH 시도, 마지막 접속 IP 방식, 패스워드 만료 예정일(7일이내만 표시), 최근 변경된 중요 24시간내 변경된것만 파일 최대 3개
+ 
