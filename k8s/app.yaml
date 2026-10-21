@@ -9,9 +9,6 @@ metadata:
   name: shop-config
   namespace: beaver
 data:
-  DB_HOST: REPLACE_WITH_DB_PRIVATE_HOST
-  DB_PORT: "3306"
-  DB_NAME: shop
   SERVER_ENV: aws
   SERVICE_MODE: active
   ENABLE_RESET: "false"
@@ -58,7 +55,8 @@ spec:
               app: shop
       containers:
         - name: shop
-          image: REPLACE_WITH_ECR_IMAGE_AND_TAG
+          image: 757517308178.dkr.ecr.ap-northeast-2.amazonaws.com/beaver-app:shop-fc188ed-20261020-105550
+          imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
@@ -73,23 +71,13 @@ spec:
           envFrom:
             - configMapRef:
                 name: shop-config
+            - secretRef:
+                name: shop-db-secret
           env:
-            - name: DB_USER
-              valueFrom:
-                secretKeyRef:
-                  name: shop-secrets
-                  key: DB_USER
-                  optional: false
-            - name: DB_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: shop-secrets
-                  key: DB_PASSWORD
-                  optional: false
             - name: SECRET_KEY
               valueFrom:
                 secretKeyRef:
-                  name: shop-secrets
+                  name: shop-session-secret
                   key: SECRET_KEY
                   optional: false
             - name: POD_NAME
