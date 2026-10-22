@@ -95,5 +95,73 @@ kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/cont
 - 실패한 SSH 시도, 마지막 접속 IP 방식, 패스워드 만료 예정일(7일이내만 표시), 최근 변경된 중요 24시간내 변경된것만 파일 최대 3개
 - 마지막 접속 IP 방식에서 -> 시간 + 접속 계정 + 방식, 다른대역에서 접속시만 강조되도록 변경
 
-- 
- 
+## 6. SSH 로그인 설정 및 보안 및 로그 표시
+
+SSH로 접속하면 **계정 입력 → 비밀번호 확인 → 정보 표시** 순서로 동작한다.
+스크립트는 `/etc/profile.d/`에 파일명 숫자 순서(90 → 91 → 92)로 실행된다.
+
+| 파일 | 역할 |
+|---|---|
+| `90-beaver-login.sh` | 로그인(`login:`), 5회 실패 시 60초 제한, 없는 계정(FAKE) 동일 처리 |
+| `91-beaver-versions.sh` | Welcome, 이전 로그인 시각, 설치 버전 표시 |
+| `92-beaver-security-summary.sh` | 서버 점검 결과 표시 |
+
+### 보안 기능
+- **로그인 전 정보 비노출**: 접속 직후에는 `login:`만 표시 (MOTD, Last login 비활성화)
+- **로그인 실패 제한**: 5회 실패 시 60초 이용 제한 후 로그인 화면으로 복귀, 제한 중 재시도 시 남은 시간 안내
+- **FAKE 계정 처리**: 존재하지 않는 아이디도 같은 화면·문구·지연·제한을 적용하여 계정 존재 여부를 알 수 없음
+- **실제 잠금**: PAM(`pam_faillock`, deny=5, unlock_time=60)이 처리하고 스크립트는 안내를 담당
+
+### 로그인 후 표시
+1. `'아이디' 아이디로 로그인되었습니다.`
+2. Welcome, 이전 로그인 시각
+3. 설치 버전 (OS, Kernel, Docker, containerd, kubelet, kubectl, AWS CLI, MySQL, Tailscale)
+4. 점검 결과
+
+### 점검 결과 (정상이면 "이상 없음", 이상 시에만 상세 표시)
+| 분류 | 점검 내용 | 경고 기준 |
+|---|---|---|
+| 서비스 | kubelet, containerd, 실패한 서비스 | 중지·실패 |
+| 연결 | Tailscale | 연결 끊김 |
+| 자원 | 디스크, 메모리 | 90% 이상 |
+| 보안 | SSH 로그인 실패, 허용 경로 외 접속, 설정 파일 변경, 패스워드 만료 | 실패 5회 이상 / 외부 접속 / 1시간 내 변경 / 7일 이내 |
+
+- 파일명·오류 원문은 숨기고 **개수와 확인 명령만** 안내
+- 해결되면 다음 로그인부터 자동으로 사라짐
+
+## 7. SSM(Systems Manager Session Manager) + Tailscale SSH 허용 + 외부 접속 테스트
+
+### 접속 방식 비교
+| 방식 | 용도 | 특징 |
+|---|---|---|
+| Tailscale SSH | 평소 접속 | 키(pem) 없이 Tailscale 계정으로 인증 |
+| Session Manager (SSM) | 비상/예비 접속 | SSH 포트(22)·pem 없이 IAM 인증, 접속 기록 남음 |
+| 일반 SSH (NAT 경유, pem) | 로그인 보안 시연 | `login:` 화면과 점검 스크립트 동작 |
+
+### SSM 설정
+- 노드 IAM 역할(`beaver-eks-node-role`)에 `AmazonSSMManagedInstanceCore` 정책 연결
+- 같은 역할을 쓰는 노드는 새로 생성/교체되어도 **자동으로 SSM에 등록**됨
+- 확인: `aws ssm describe-instance-information` 에서 `Online` 확인
+
+### Windows 접속 (Session Manager)
+1. AWS CLI 설치 확인 (`aws --version`)
+2. `aws configure` 로 본인 IAM 사용자 액세스 키 등록 (리전 `ap-northeast-2`)
+3. Session Manager 플러그인 설치 후 `session-manager-plugin` 으로 확인
+4. 접속: `aws ssm start-session --target <인스턴스ID> --region ap-northeast-2`
+5. 접속 후 `sudo su - ubuntu`
+- 키 없이 쓰려면 콘솔(Systems Manager > Session Manager > 세션 시작)에서 브라우저로 접속
+
+### Tailscale SSH 허용
+- 노드: `tailscale up --ssh --advertise-tags=tag:aws-app`
+- Tailscale 정책(Access controls)의 `ssh` 규칙에 `tag:aws-app` 대상 `ubuntu` 접속 허용 추가
+- 접속: `ssh ubuntu@<Tailscale IP>`
+
+### 외부 접속 테스트
+- Tailscale 연결 상태에서 외부 PC(Windows PowerShell)로 SSH 접속 확인
+- SSM 목록에서 노드 `Online` 확인 후 세션 접속 확인
+- 로그인 실패 5회 제한, FAKE 계정 동작 확인
+
+### 주의 사항
+- 액세스 키·인증키·비밀번호는 문서, 깃, 채팅에 기록하지 않는다
+- 노드가 교체되면 인스턴스 ID와 Tailscale IP가 바뀐다 (사용자 데이터에 `--ssh`, 태그 설정 포함 필요)
+- SSM 접속은 `login:` 화면을 거치지 않고 접속 기록은 Session Manager 히스토리에 남는다
