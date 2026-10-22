@@ -1,37 +1,84 @@
-[ -t 1 ] || return 0
-NAT_IP="10.0.1.49"
-echo "---- 보안 요약 ($USER) ----"
-
-# 1. 실패한 SSH 로그인 (최근 24시간)
-fails=$(sudo -n journalctl -u ssh -u ssh.socket --since "24 hours ago" --no-pager 2>/dev/null | grep -c "Failed password\|Invalid user")
-[ "${fails:-0}" -ge 5 ] && flag=" [주의]" || flag=""
-echo "실패한 SSH 시도(24h): ${fails:-0}회$flag"
-
-# 2. 직전 접속 (시간 + 계정 + 방식), NAT 외 IP면 경고
-prev=$(last -n 2 -a -w "$USER" 2>/dev/null | grep -v "still logged in" | grep -E "pts/|tty" | head -1)
-if [ -z "$prev" ]; then
-  prev=$(last -n 3 -a -w "$USER" 2>/dev/null | grep -E "pts/|tty" | sed -n '2p')
-fi
-if [ -n "$prev" ]; then
-  p_tty=$(echo "$prev" | awk '{print $2}')
-  p_time=$(echo "$prev" | awk '{print $4" "$5" "$6}')
-  p_ip=$(echo "$prev" | awk '{print $NF}')
-  case "$p_tty" in pts/*) method="SSH" ;; tty*|ttyS*) method="콘솔" ;; *) method="$p_tty" ;; esac
-  line="이전 접속: $p_time | 계정 $USER | 방식 $method($p_tty)"
-  if [ -n "$p_ip" ] && [ "$p_ip" != "$NAT_IP" ] && [ "$p_ip" != "$p_tty" ]; then
-    line="$line | 출발지 $p_ip [주의: NAT 외 접속]"
-  fi
-  echo "$line"
+# [팀원 계정으로 전환된 세션] 로그인 안내
+if [ -n "$BEAVER_LOGIN_AS" ]; then
+    echo "'$USER' 아이디로 로그인되었습니다."
+    unset BEAVER_LOGIN_AS
+    return 0
 fi
 
-# 3. 패스워드 만료 7일 이내만
-exp=$(chage -l "$USER" 2>/dev/null | awk -F': ' '/Password expires/{print $2}')
-if [ -n "$exp" ] && [ "$exp" != "never" ]; then
-  d=$(( ( $(date -d "$exp" +%s) - $(date +%s) ) / 86400 ))
-  [ "$d" -le 7 ] && echo "패스워드 만료: ${d}일 후 ($exp)"
-fi
+# [ubuntu로 SSH 접속한 대화형 터미널] 계정 선택
+[ -t 0 ] && [ -t 1 ] || return 0
+[ "$USER" = "ubuntu" ] && [ -n "$SSH_CONNECTION" ] || return 0
 
-# 4. 24시간 내 변경된 중요 설정 (최대 3개, 호스트 키 제외)
-chg=$(sudo -n find /etc/ssh /etc/sudoers.d /etc/pam.d -type f -mtime -1 ! -name 'ssh_host_*' 2>/dev/null | head -3)
-[ -n "$chg" ] && echo "최근 변경된 설정: $(echo $chg | tr '\n' ' ')"
-echo "-----------------------------"
+# ---- 잠금 계산: 표준입력의 실패 시각(epoch)으로 남은 초 계산 ----
+# 15분 내 실패 5회 이상 + 마지막 실패 후 60초 이내면 잠김
+calc_remaining() {
+    local now cnt=0 last=0 ts
+    now=$(date +%s)
+    while read -r ts; do
+        [ -z "$ts" ] && continue
+        [ $((now - ts)) -lt 900 ] && cnt=$((cnt + 1))
+        [ "$ts" -gt "$last" ] && last=$ts
+    done
+    if [ "$cnt" -ge 5 ] && [ $((now - last)) -lt 60 ]; then
+        echo $((60 - (now - last)))
+    else
+        echo 0
+    fi
+}
+
+# 실제 계정: faillock 기록 사용
+real_remaining() {
+    sudo -n faillock --user "$1" 2>/dev/null \
+      | awk '$NF=="V"{print $1, $2}' \
+      | while read -r d t; do date -d "$d $t" +%s 2>/dev/null; done \
+      | calc_remaining
+}
+
+# 없는 계정(페이크): 공용 기록 폴더 사용
+FAKE_DIR=/var/tmp/.beaver-auth
+[ -d "$FAKE_DIR" ] || sudo -n install -d -m 1777 "$FAKE_DIR" 2>/dev/null
+fake_file() { echo "$FAKE_DIR/$(printf '%s' "$1" | sha256sum | cut -c1-16)"; }
+fake_remaining() {
+    local f left; f=$(fake_file "$1")
+    [ -f "$f" ] || { echo 0; return; }
+    left=$(calc_remaining < "$f")
+    # 제한 시간이 끝났고 5회 이상 쌓여 있으면 기록 초기화
+    if [ "$left" -eq 0 ] && [ "$(wc -l < "$f")" -ge 5 ]; then : > "$f" 2>/dev/null; fi
+    echo "$left"
+}
+fake_fail() {
+    local f; f=$(fake_file "$1")
+    date +%s >> "$f" 2>/dev/null
+    chmod 666 "$f" 2>/dev/null
+}
+
+while true; do
+    printf "login: "
+    read -r name || return 0
+    { [ -z "$name" ] || [ "$name" = "ubuntu" ]; } && return 0
+
+    if id "$name" >/dev/null 2>&1; then real=1; else real=0; fi
+
+    for try in 1 2 3 4 5; do
+        if [ "$real" -eq 1 ]; then left=$(real_remaining "$name"); else left=$(fake_remaining "$name"); fi
+        if [ "$left" -gt 0 ]; then
+            echo "이용이 제한된 계정입니다. 약 ${left}초 후 다시 시도해 주세요."
+            echo
+            continue 2
+        fi
+
+        if [ "$real" -eq 1 ]; then
+            if BEAVER_LOGIN_AS=1 su - "$name" -w BEAVER_LOGIN_AS; then
+                exit 0
+            fi
+        else
+            read -rs -p "Password: " _dummy; echo
+            sleep 2
+            echo "su: Authentication failure"
+            fake_fail "$name"
+        fi
+        [ "$try" -lt 5 ] && echo "아이디 또는 비밀번호를 확인해 주세요. ($try/5)"
+    done
+    echo "비밀번호를 5회 잘못 입력하여 60초 동안 계정 이용이 제한됩니다."
+    echo
+done
