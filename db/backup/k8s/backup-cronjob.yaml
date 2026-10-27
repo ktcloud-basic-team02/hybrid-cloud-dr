@@ -1,0 +1,121 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  annotations: {}
+  name: shop-db-backup
+  namespace: beaver
+spec:
+  concurrencyPolicy: Forbid
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        spec:
+          activeDeadlineSeconds: 600
+          containers:
+          - args:
+            - |
+              BUCKET=s3://beaver-backup-s3/DB
+              NOW=$(TZ=KST-9 date +%Y%m%d_%H%M)
+              STATUS=$(cat /dump/rds_status)
+
+              record() {
+                echo "$NOW $1 $2" > /tmp/status.txt
+                aws s3 cp /tmp/status.txt "$BUCKET/status/${NOW}_$1.txt"
+              }
+              stamp() {
+                aws cloudwatch put-metric-data --namespace Beaver/DBBackup --metric-name BackupHeartbeat --value 1
+              }
+
+              case "$STATUS" in
+                stopped|stopping|starting)
+                  record S "rds=$STATUS"
+                  stamp
+                  echo "RESULT: S"
+                  exit 0 ;;
+              esac
+
+              if [ -f /dump/dump_ok ]; then
+                read NAME SUM SIZE < /dump/dump_ok
+                if aws s3 cp "/dump/$NAME" "$BUCKET/$NAME" --checksum-algorithm SHA256; then
+                  record Y "sha256=$SUM size=$SIZE"
+                  stamp
+                  echo "RESULT: Y"
+                  exit 0
+                fi
+              fi
+
+              record N "rds=$STATUS"
+              echo "RESULT: N"
+              exit 1
+            command:
+            - /bin/sh
+            - -c
+            env:
+            - name: AWS_DEFAULT_REGION
+              value: ap-northeast-2
+            image: amazon/aws-cli
+            name: upload
+            volumeMounts:
+            - mountPath: /dump
+              name: dump
+          initContainers:
+          - args:
+            - |
+              STATUS=$(aws rds describe-db-instances --db-instance-identifier beaver-rds --query "DBInstances[0].DBInstanceStatus" --output text 2>/dev/null)
+              [ -z "$STATUS" ] && STATUS=unknown
+              echo "$STATUS" > /dump/rds_status
+              echo "RDS status: $STATUS"
+            command:
+            - /bin/sh
+            - -c
+            env:
+            - name: AWS_DEFAULT_REGION
+              value: ap-northeast-2
+            image: amazon/aws-cli
+            name: check-rds
+            volumeMounts:
+            - mountPath: /dump
+              name: dump
+          - args:
+            - |
+              STATUS=$(cat /dump/rds_status)
+              if [ "$STATUS" != "available" ] && [ "$STATUS" != "backing-up" ]; then
+                echo "skip dump: RDS $STATUS"
+                exit 0
+              fi
+              FILE=/dump/shop_$(TZ=KST-9 date +%Y%m%d_%H%M%S).sql
+              if MYSQL_PWD="$DB_PASSWORD" mysqldump -h "$DB_HOST" -u "$DB_USER" \
+                   --single-transaction --set-gtid-purged=OFF --no-tablespaces \
+                   "$DB_NAME" > "$FILE" \
+                 && test -s "$FILE" \
+                 && tail -n 1 "$FILE" | grep -q "Dump completed"; then
+                SUM=$(sha256sum "$FILE" | cut -d' ' -f1)
+                SIZE=$(wc -c < "$FILE")
+                echo "$(basename "$FILE") $SUM $SIZE" > /dump/dump_ok
+                echo "dump ok: $(cat /dump/dump_ok)"
+              else
+                echo "dump failed"
+                rm -f "$FILE"
+              fi
+              exit 0
+            command:
+            - /bin/sh
+            - -c
+            envFrom:
+            - secretRef:
+                name: shop-backup-secret
+            image: mysql:8.4
+            name: mysqldump
+            volumeMounts:
+            - mountPath: /dump
+              name: dump
+          restartPolicy: Never
+          serviceAccountName: db-backup-sa
+          volumes:
+          - emptyDir: {}
+            name: dump
+  schedule: 0 22 * * *
+  successfulJobsHistoryLimit: 3
+  timeZone: Asia/Seoul

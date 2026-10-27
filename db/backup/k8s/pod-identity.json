@@ -1,0 +1,6 @@
+{
+    "cluster": "beaver-eks-test",
+    "namespace": "beaver",
+    "serviceAccount": "db-backup-sa",
+    "roleArn": "arn:aws:iam::<ACCOUNT_ID>:role/beaver-db-backup-role"
+}

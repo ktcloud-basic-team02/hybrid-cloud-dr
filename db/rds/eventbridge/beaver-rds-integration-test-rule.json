@@ -1,0 +1,6 @@
+{
+    "Name": "beaver-rds-integration-test-rule",
+    "State": "ENABLED",
+    "Description": "test for Beaver RDS monitoring",
+    "EventPattern": "{\"source\":[\"beaver.integration-test\"],\"detail-type\":[\"Beaver RDS Integration Test\"]}"
+}

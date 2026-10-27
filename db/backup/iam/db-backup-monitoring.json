@@ -1,0 +1,22 @@
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "CheckRdsStatus",
+            "Effect": "Allow",
+            "Action": "rds:DescribeDBInstances",
+            "Resource": "*"
+        },
+        {
+            "Sid": "PutBackupHeartbeat",
+            "Effect": "Allow",
+            "Action": "cloudwatch:PutMetricData",
+            "Resource": "*",
+            "Condition": {
+                "StringEquals": {
+                    "cloudwatch:namespace": "Beaver/DBBackup"
+                }
+            }
+        }
+    ]
+}

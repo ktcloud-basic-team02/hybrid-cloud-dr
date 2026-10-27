@@ -1,0 +1,9 @@
+{
+    "Name": "beaver-rds-event-handler",
+    "Runtime": "python3.13",
+    "Role": "arn:aws:iam::<ACCOUNT_ID>:role/service-role/beaver-rds-event-handler-role-33vh5pfb",
+    "EnvKeys": [
+        "SNS_TOPIC_ARN"
+    ],
+    "LastModified": "2026-10-21T08:11:27.000+0000"
+}

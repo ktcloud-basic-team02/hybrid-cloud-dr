@@ -1,0 +1,6 @@
+[
+    {
+        "Id": "c7d05def-08c6-4d8e-a0b1-da8173b010f8",
+        "Arn": "arn:aws:lambda:ap-northeast-2:<ACCOUNT_ID>:function:beaver-rds-event-handler"
+    }
+]
