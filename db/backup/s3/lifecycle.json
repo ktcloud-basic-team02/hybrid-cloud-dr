@@ -1,0 +1,25 @@
+{
+    "TransitionDefaultMinimumObjectSize": "all_storage_classes_128K",
+    "Rules": [
+        {
+            "Expiration": {
+                "Days": 7
+            },
+            "ID": "db-backup-expire-7days",
+            "Filter": {
+                "Prefix": "DB/"
+            },
+            "Status": "Enabled"
+        },
+        {
+            "Expiration": {
+                "Days": 7
+            },
+            "ID": "pod-records-expire-7days",
+            "Filter": {
+                "Prefix": "pod-records/"
+            },
+            "Status": "Enabled"
+        }
+    ]
+}

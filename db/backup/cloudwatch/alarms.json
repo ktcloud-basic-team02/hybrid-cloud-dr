@@ -1,0 +1,126 @@
+[
+    {
+        "AlarmName": "beaver-db-backup-missing",
+        "AlarmArn": "arn:aws:cloudwatch:ap-northeast-2:<ACCOUNT_ID>:alarm:beaver-db-backup-missing",
+        "AlarmConfigurationUpdatedTimestamp": "2026-10-24T13:23:11.949000+00:00",
+        "ActionsEnabled": true,
+        "OKActions": [
+            "arn:aws:sns:ap-northeast-2:<ACCOUNT_ID>:beaver-db-backup-alert"
+        ],
+        "AlarmActions": [
+            "arn:aws:sns:ap-northeast-2:<ACCOUNT_ID>:beaver-db-backup-alert"
+        ],
+        "InsufficientDataActions": [],
+        "StateValue": "OK",
+        "StateReason": "Threshold Crossed: 1 out of the last 2 datapoints [1.0 (22/10/26 12:46:00)] was not less than the threshold (1.0) and 1 missing datapoint was treated as [Breaching] (minimum 1 datapoint for ALARM -> OK transition).",
+        "StateReasonData": "{\"version\":\"1.0\",\"queryDate\":\"2026-10-22T13:46:42.671+0000\",\"startDate\":\"2026-10-22T12:46:00.000+0000\",\"statistic\":\"Sum\",\"period\":3600,\"recentDatapoints\":[1.0],\"threshold\":1.0,\"evaluatedDatapoints\":[{\"timestamp\":\"2026-10-22T12:46:00.000+0000\",\"sampleCount\":1.0,\"value\":1.0}]}",
+        "StateUpdatedTimestamp": "2026-10-22T13:46:42.674000+00:00",
+        "MetricName": "BackupHeartbeat",
+        "Namespace": "Beaver/DBBackup",
+        "Statistic": "Sum",
+        "Dimensions": [],
+        "Period": 86400,
+        "EvaluationPeriods": 1,
+        "DatapointsToAlarm": 1,
+        "Threshold": 1.0,
+        "ComparisonOperator": "LessThanThreshold",
+        "TreatMissingData": "breaching",
+        "StateTransitionedTimestamp": "2026-10-22T13:46:42.674000+00:00"
+    },
+    {
+        "AlarmName": "beaver-rds-connections-high",
+        "AlarmArn": "arn:aws:cloudwatch:ap-northeast-2:<ACCOUNT_ID>:alarm:beaver-rds-connections-high",
+        "AlarmDescription": "기준 1분 평균 연결 수가 5회 연속 10개를 초과할때",
+        "AlarmConfigurationUpdatedTimestamp": "2026-10-21T08:37:01.077000+00:00",
+        "ActionsEnabled": true,
+        "OKActions": [],
+        "AlarmActions": [
+            "arn:aws:sns:ap-northeast-2:<ACCOUNT_ID>:beaver-rds-alerts"
+        ],
+        "InsufficientDataActions": [],
+        "StateValue": "OK",
+        "StateReason": "Threshold Crossed: 1 out of the last 5 datapoints [0.0 (27/10/26 05:18:00)] was not greater than the threshold (10.0) (minimum 1 datapoint for ALARM -> OK transition).",
+        "StateReasonData": "{\"version\":\"1.0\",\"queryDate\":\"2026-10-27T05:19:33.381+0000\",\"startDate\":\"2026-10-27T05:18:00.000+0000\",\"statistic\":\"Average\",\"period\":60,\"recentDatapoints\":[0.0],\"threshold\":10.0,\"evaluatedDatapoints\":[{\"timestamp\":\"2026-10-27T05:18:00.000+0000\",\"sampleCount\":1.0,\"value\":0.0}]}",
+        "StateUpdatedTimestamp": "2026-10-27T05:19:33.382000+00:00",
+        "MetricName": "DatabaseConnections",
+        "Namespace": "AWS/RDS",
+        "Statistic": "Average",
+        "Dimensions": [
+            {
+                "Name": "DBInstanceIdentifier",
+                "Value": "beaver-rds"
+            }
+        ],
+        "Period": 60,
+        "EvaluationPeriods": 5,
+        "DatapointsToAlarm": 5,
+        "Threshold": 10.0,
+        "ComparisonOperator": "GreaterThanThreshold",
+        "TreatMissingData": "missing",
+        "StateTransitionedTimestamp": "2026-10-27T05:19:33.382000+00:00"
+    },
+    {
+        "AlarmName": "beaver-rds-cpu-high",
+        "AlarmArn": "arn:aws:cloudwatch:ap-northeast-2:<ACCOUNT_ID>:alarm:beaver-rds-cpu-high",
+        "AlarmDescription": "기준 80%",
+        "AlarmConfigurationUpdatedTimestamp": "2026-10-21T08:26:41.951000+00:00",
+        "ActionsEnabled": true,
+        "OKActions": [],
+        "AlarmActions": [
+            "arn:aws:sns:ap-northeast-2:<ACCOUNT_ID>:beaver-rds-alerts"
+        ],
+        "InsufficientDataActions": [],
+        "StateValue": "OK",
+        "StateReason": "Threshold Crossed: 1 out of the last 5 datapoints [55.<ACCOUNT_ID>9 (27/10/26 05:17:00)] was not greater than the threshold (80.0) (minimum 1 datapoint for ALARM -> OK transition).",
+        "StateReasonData": "{\"version\":\"1.0\",\"queryDate\":\"2026-10-27T05:19:28.161+0000\",\"startDate\":\"2026-10-27T05:17:00.000+0000\",\"statistic\":\"Average\",\"period\":60,\"recentDatapoints\":[55.<ACCOUNT_ID>9],\"threshold\":80.0,\"evaluatedDatapoints\":[{\"timestamp\":\"2026-10-27T05:17:00.000+0000\",\"sampleCount\":1.0,\"value\":55.<ACCOUNT_ID>9}]}",
+        "StateUpdatedTimestamp": "2026-10-27T05:19:28.163000+00:00",
+        "MetricName": "CPUUtilization",
+        "Namespace": "AWS/RDS",
+        "Statistic": "Average",
+        "Dimensions": [
+            {
+                "Name": "DBInstanceIdentifier",
+                "Value": "beaver-rds"
+            }
+        ],
+        "Period": 60,
+        "EvaluationPeriods": 5,
+        "DatapointsToAlarm": 5,
+        "Threshold": 80.0,
+        "ComparisonOperator": "GreaterThanThreshold",
+        "TreatMissingData": "missing",
+        "StateTransitionedTimestamp": "2026-10-27T05:19:28.163000+00:00"
+    },
+    {
+        "AlarmName": "beaver-rds-storage-low",
+        "AlarmArn": "arn:aws:cloudwatch:ap-northeast-2:<ACCOUNT_ID>:alarm:beaver-rds-storage-low",
+        "AlarmDescription": "기준 2Gi 미만",
+        "AlarmConfigurationUpdatedTimestamp": "2026-10-21T08:31:41.240000+00:00",
+        "ActionsEnabled": true,
+        "OKActions": [],
+        "AlarmActions": [
+            "arn:aws:sns:ap-northeast-2:<ACCOUNT_ID>:beaver-rds-alerts"
+        ],
+        "InsufficientDataActions": [],
+        "StateValue": "OK",
+        "StateReason": "Threshold Crossed: 1 out of the last 3 datapoints [1.9497406464E10 (27/10/26 05:18:00)] was not less than the threshold (2.147483648E9) (minimum 1 datapoint for ALARM -> OK transition).",
+        "StateReasonData": "{\"version\":\"1.0\",\"queryDate\":\"2026-10-27T05:19:47.755+0000\",\"startDate\":\"2026-10-27T05:18:00.000+0000\",\"statistic\":\"Average\",\"period\":60,\"recentDatapoints\":[1.9497406464E10],\"threshold\":2.147483648E9,\"evaluatedDatapoints\":[{\"timestamp\":\"2026-10-27T05:18:00.000+0000\",\"sampleCount\":1.0,\"value\":1.9497406464E10}]}",
+        "StateUpdatedTimestamp": "2026-10-27T05:19:47.757000+00:00",
+        "MetricName": "FreeStorageSpace",
+        "Namespace": "AWS/RDS",
+        "Statistic": "Average",
+        "Dimensions": [
+            {
+                "Name": "DBInstanceIdentifier",
+                "Value": "beaver-rds"
+            }
+        ],
+        "Period": 60,
+        "EvaluationPeriods": 3,
+        "DatapointsToAlarm": 3,
+        "Threshold": 2147483648.0,
+        "ComparisonOperator": "LessThanThreshold",
+        "TreatMissingData": "missing",
+        "StateTransitionedTimestamp": "2026-10-27T05:19:47.757000+00:00"
+    }
+]

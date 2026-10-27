@@ -1,0 +1,8 @@
+# db-backup-sa : 백업 CronJob(shop-db-backup) 파드가 쓰는 ServiceAccount
+# [2026-10-27 작성] 정혜빈 (DB) - 실제 클러스터 설정에서 자동 생성 값(uid 등) 제외하고 정리
+# IAM 역할 연결은 Pod Identity로 함 (pod-identity.json 참고, annotation 불필요)
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: db-backup-sa
+  namespace: beaver

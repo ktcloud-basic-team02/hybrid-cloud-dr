@@ -1,0 +1,21 @@
+{
+    "Engine": "mysql",
+    "Version": "8.4.9",
+    "Class": "db.t4g.micro",
+    "MultiAZ": true,
+    "Storage": "gp3",
+    "SizeGiB": 20,
+    "DBName": "shop",
+    "SubnetGroup": "beaver-network-dbsubnetgroup-rjeuibsyi7ps",
+    "SecurityGroups": [
+        "sg-0a72881d68d293594"
+    ],
+    "BackupDays": 7,
+    "BackupWindow": "13:49-14:19",
+    "MaintenanceWindow": "mon:14:52-mon:15:22",
+    "AutoMinorUpgrade": false,
+    "DeletionProtection": true,
+    "Encrypted": true,
+    "ParameterGroup": "default.mysql8.4",
+    "ManagedPassword": true
+}
